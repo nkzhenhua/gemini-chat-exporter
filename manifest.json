@@ -2,7 +2,9 @@
   "manifest_version": 3,
   "name": "Gemini Chat Exporter",
   "version": "1.0.0",
-  "description": "Export Gemini chat conversations to Markdown files",
+  "description": "Export Google Gemini conversations to beautifully formatted Markdown files with real-time progress tracking and cancel support",
+  "author": "Your Name",
+  "homepage_url": "https://github.com/yourusername/gemini-exporter",
   "permissions": [
     "activeTab",
     "scripting",

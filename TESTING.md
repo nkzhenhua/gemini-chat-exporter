@@ -1,214 +1,391 @@
 # Testing Guide - Gemini Chat Exporter
 
-## Recent Updates (Latest)
+## Current Version: v1.0.0
 
-### Issue 3: Insufficient Wait Time for Loading ✅ FIXED
-**Problem**: Only waiting 1 second after scrolling wasn't enough for Gemini to load messages.
-
-**Root Cause**: 
-- 1 second wait time too short for slow networks or large message batches
-- No detection of loading spinners
-- Messages might still be loading when collection started
-
-**Solution**:
-- ✅ Increased wait time from 1s to 2s per scroll
-- ✅ Added `waitForLoading()` function to detect loading spinners
-- ✅ Waits up to 10 seconds for spinners to disappear before continuing
-- ✅ More verbose console logs showing each step
-- ✅ Final collection pass at 3 positions (top, middle, bottom)
+All major features implemented and tested:
+- ✅ Rich Markdown export with formatting
+- ✅ Real-time progress tracking
+- ✅ On-page progress overlay
+- ✅ Cancel functionality
+- ✅ Two-phase scroll strategy
+- ✅ Auto-recovery from errors
 
 ---
 
-## Previous Updates
+## Quick Test (5 minutes)
 
-### Issue 1: Missing User Messages ✅ FIXED
-**Problem**: Only Gemini responses were being exported, user questions were missing.
+### Basic Functionality
+1. Reload extension at `chrome://extensions/`
+2. Go to gemini.google.com
+3. Open any conversation (10-20 messages recommended)
+4. Press F12 to open Console
+5. Click extension icon → "Download Chat"
+6. Watch progress overlay (bottom-right)
+7. Wait for completion
+8. Check downloaded `.md` file
 
-**Root Cause**: Incorrect DOM selectors not matching Gemini's actual HTML structure.
-
-**Solution**: 
-- Completely rewrote `collectVisibleMessages()` with 4 different strategies
-- Improved `isUserMessage()` with 6 different detection methods
-- Added comprehensive debugging logs
-
-### Issue 2: Filename Not Using Conversation Title ✅ FIXED
-**Problem**: Downloaded files used timestamps instead of conversation title.
-
-**Solution**:
-- Added `getConversationTitle()` function with 4 fallback methods
-- Updated `downloadMarkdown()` to sanitize title and use it as filename
-- Filename format: `conversation-title.md` (or `gemini-chat-TIMESTAMP.md` as fallback)
+**Expected Result**:
+- ✅ Progress bar shows 0% → 100%
+- ✅ Phase changes (1/2 → 2/2)
+- ✅ Green success message with stats
+- ✅ File downloads with conversation title
+- ✅ Markdown has lists, headings, bold text
 
 ---
 
-## How to Test
+## Comprehensive Test Scenarios
 
-### 1. Reload the Extension
+### Test 1: Short Conversation (< 20 messages)
 
-Since we made significant changes:
-1. Open `chrome://extensions/`
-2. Find "Gemini Chat Exporter"
-3. Click the **reload icon** (circular arrow)
+**Steps**:
+1. Export a 5-10 message conversation
+2. Observe progress in overlay
 
-### 2. Open Developer Console for Debugging
+**Expected**:
+- Duration: ~5-10 seconds
+- File size: < 10KB
+- All messages present
+- Proper formatting
 
-**IMPORTANT**: Open F12 console to see detailed logs!
-
-1. Go to gemini.google.com
-2. Press **F12** to open Developer Tools
-3. Click on the **Console** tab
-4. Open any conversation (short or long)
-5. Click the extension icon
-6. Click "Download Chat"
-
-### 3. Watch the Console Logs
-
-You should see detailed output like this:
-
+**Console Output**:
 ```
 Starting chat export...
-Conversation title: How to learn JavaScript
-Starting upward scroll and message collection...
-[Collection] Using strategy: model-response-user-query, found 24 elements
-[Message 1] User: How do I learn JavaScript?...
-[Message 2] Gemini: JavaScript is a versatile programming language...
-[Message 3] User: What are the best resources?...
-[Message 4] Gemini: Here are some great resources for learning...
-[Collection] This iteration: 2 user, 2 Gemini messages
-Scroll attempt 1, collected 4 messages
-[Collection] Using strategy: model-response-user-query, found 32 elements
-[Collection] This iteration: 3 user, 5 Gemini messages
-Scroll attempt 2, collected 12 messages
-...
-Scrolling complete. Attempted 5 times, collected 24 messages
-Collected 24 messages in total
-Downloading as: how-to-learn-javascript.md
+Conversation title: [title]
+Phase 1: Scrolling through conversation...
+Phase 2: Collecting messages in order...
+Collected 10 messages in total
+Downloading as: [title].md
 ```
 
-### 4. Verify the Export
+### Test 2: Medium Conversation (20-100 messages)
 
-Check the downloaded file:
+**Steps**:
+1. Export a ~50 message conversation
+2. Can close popup during export
+3. Watch on-page overlay
 
-✅ **Filename**: Should be based on conversation title  
-   Example: `how-to-learn-javascript.md`  
-   Fallback: `gemini-chat-2026-02-04T22-57-19.md`
+**Expected**:
+- Duration: ~20-40 seconds
+- Progress updates smoothly
+- Message count increases
+- File includes all messages
 
-✅ **Content**: Open the file and verify:
-   ```markdown
-   # How to learn JavaScript
-   
-   Exported: 2/4/2026, 10:57:19 PM
-   
-   Total messages: 24
-   
-   ---
-   
-   ## User
-   
-   How do I learn JavaScript?
-   
-   ---
-   
-   ## Gemini
-   
-   JavaScript is a versatile programming language...
-   
-   ---
-   
-   ## User
-   
-   What are the best resources?
-   
-   ---
-   ```
+### Test 3: Long Conversation (100+ messages)
 
-✅ **Message Count**: Should include BOTH user and Gemini messages
+**Steps**:
+1. Export 100+ message conversation
+2. Monitor console for scroll attempts
+3. Verify final message count
+
+**Expected**:
+- Duration: ~60-120 seconds
+- Multiple scroll attempts logged
+- All messages captured
+- Proper chronological order
+
+**Console Monitoring**:
+```
+[Load] Scroll position: 15000/48188
+[Collect] Position: 25000, Found 50 new. Total: 125
+```
+
+### Test 4: Rich Formatting
+
+**Setup**: Find a conversation with:
+- Bullet lists
+- Numbered lists
+- Headings
+- Code blocks
+- Bold/italic text
+
+**Steps**:
+1. Export the conversation
+2. Open `.md` file in VS Code or Obsidian
+3. Check formatting renders correctly
+
+**Expected Markdown**:
+```markdown
+## Section Title
+
+Some text here.
+
+- Bullet point 1
+- Bullet point 2
+  - Nested item
+  - Another nested item
+
+1. First numbered item
+2. Second numbered item
+
+**Bold text** and *italic text*
+
+Inline `code` example
+
+```python
+def example():
+    return "Code block"
+```
+```
+
+### Test 5: Cancel Functionality
+
+**Test 5a: Cancel During Phase 1**
+1. Start export on long conversation
+2. Wait ~5 seconds (should be in Phase 1)
+3. Click "Cancel" button
+4. Verify orange cancellation message
+5. Check no file was downloaded
+
+**Test 5b: Cancel During Phase 2**
+1. Start export
+2. Wait until "Phase 2/2" appears
+3. Click "Cancel"
+4. Same verification as 5a
+
+**Expected**:
+- Immediate response (< 500ms)
+- Orange "Export Cancelled" message
+- Auto-hide after 5 seconds
+- No partial file download
+
+### Test 6: Progress Display with Closed Popup
+
+**Steps**:
+1. Click export
+2. Immediately close popup window
+3. Watch on-page overlay
+4. Wait for completion
+
+**Expected**:
+- Progress continues without popup
+- Overlay shows all updates
+- Success message appears on page
+- File downloads normally
+
+### Test 7: Error Recovery
+
+**Test 7a: Connection Error**
+1. Open new conversation (no content script)
+2. Click export immediately
+3. Should see auto-refresh message
+
+**Test 7b: Invalid Page**
+1. Go to non-Gemini page
+2. Icon should be grayscale
+3. Tooltip: "Available on Gemini pages"
+
+### Test 8: Unicode and Special Characters
+
+**Steps**:
+1. Export conversation with:
+   - Chinese characters
+   - Emoji 😊
+   - Special symbols (★, ©, ™)
+   - Math symbols (∑, ∫, ≈)
+
+**Expected**:
+- All characters preserved
+- Filename sanitized but readable
+- Content displays correctly
+
+### Test 9: Edge Cases
+
+**Test 9a: Very Short Title**
+- Conversation title: "Hi"
+- Expected filename: `hi.md` or fallback to timestamp
+
+**Test 9b: Special Chars in Title**
+- Title: "How to: Learn JS? (2024)"
+- Expected: `how-to-learn-js-2024.md`
+
+**Test 9c: Empty Conversation**
+- New conversation with no messages
+- Should export with 0 messages
+
+**Test 9d: Code-Heavy Conversation**
+- Many code blocks
+- Should preserve all code with language tags
 
 ---
 
-## Debugging Tips
+## Performance Benchmarks
 
-### If still seeing issues:
-
-1. **Check which strategy is being used**:
-   Look for: `[Collection] Using strategy: XXX`
-   - Best: `model-response-user-query`
-   - Good: `data-message-author-role`
-   - Fallback: `generic-divs`
-
-2. **Check user vs Gemini counts**:
-   Look for: `[Collection] This iteration: X user, Y Gemini messages`
-   - Should see roughly equal numbers (or more Gemini if responses are longer)
-   - If you see `0 user`, the detection is failing
-
-3. **Check for detection warnings**:
-   Look for: `[Detection] Unable to determine message type`
-   - This means the user/Gemini detection failed
-   - All ambiguous messages default to "Gemini"
-
-4. **Copy the DOM structure**:
-   If it's still not working, in console run:
-   ```javascript
-   // Find a user message element
-   const userMsg = document.querySelector('user-query');
-   console.log(userMsg);
-   console.log(userMsg.outerHTML);
-   
-   // Find a Gemini response element  
-   const geminiMsg = document.querySelector('model-response');
-   console.log(geminiMsg);
-   console.log(geminiMsg.outerHTML);
-   ```
-   
-   Share this output so we can improve the selectors.
+| Messages | Expected Time | File Size |
+|----------|---------------|-----------|
+| 10       | 5-10 sec     | < 5 KB    |
+| 50       | 20-30 sec    | 10-30 KB  |
+| 100      | 40-60 sec    | 30-100 KB |
+| 200+     | 60-120 sec   | 100-300 KB|
 
 ---
 
-## Expected Behavior
+## Console Log Patterns
 
-### For Short Conversations (< 20 messages):
-- Export should complete in 5-10 seconds
-- All messages should be captured
-- Filename should use conversation title
+### Successful Export
+```
+Starting chat export...
+Conversation title: Investment Advice
+Phase 1: Scrolling through conversation to load all content...
+[Load] Height updated to 48188
+[Load] Scroll position: 24000/48188
+Phase 1 complete: All content should be loaded.
+Phase 2: Collecting messages in order from top to bottom...
+[Collect] Position: 0, Found 50 new. Total: 50
+[Collect] Position: 5000, Found 30 new. Total: 80
+✓ Collection complete. Total messages: 127
+Collected 127 messages in total
+Downloading as: investment-advice.md
+```
 
-### For Long Conversations (> 50 messages):
-- Export may take 30-60 seconds
-- Console will show progress: "Scroll attempt X, collected Y messages"
-- Should capture ALL messages (both user and Gemini)
-- Filename should use conversation title or first user message
+### Cancelled Export
+```
+Starting chat export...
+Phase 1: Scrolling through conversation...
+[Load] Scroll position: 12000/48188
+Export cancelled during Phase 1
+```
 
-### For Very Long Conversations (> 100 messages):
-- May take 1-2 minutes
-- More scroll attempts will be shown
-- Edge scrolling (top, bottom, middle) ensures complete coverage
-
----
-
-## Known Limitations
-
-1. **Gemini UI Changes**: If Google updates Gemini's HTML structure, selectors may need updating
-2. **Very Short Titles**: Titles < 3 characters will use timestamp instead
-3. **Special Characters**: Titles with special chars will be sanitized (e.g., `"How to: Learn JS?"` → `how-to-learn-js.md`)
-
----
-
-## Success Criteria
-
-✅ Downloaded file includes BOTH user questions AND Gemini responses  
-✅ Filename uses conversation title (not timestamp)  
-✅ Message count matches what's visible in the UI  
-✅ All messages are in correct chronological order  
-✅ Console logs show balanced user/Gemini counts  
+### Error Scenario
+```
+Starting chat export...
+Error: Could not establish connection. Receiving end does not exist.
+(Auto-recovery: page refresh initiated)
+```
 
 ---
 
-## If It Still Doesn't Work
+## Known Issues & Workarounds
 
-Please share:
-1. Console logs (full output)
-2. How many messages in the conversation
-3. A screenshot of the Gemini chat page
-4. Which strategy was used (from console)
-5. User vs Gemini message counts (from console)
+### Issue: Progress bar stuck at 45%
 
-This will help debug any remaining issues!
+**Cause**: Waiting for loading spinners to disappear  
+**Solution**: Wait up to 10 seconds; if truly stuck, cancel and retry  
+**Prevention**: Planned timeout improvements in v1.1
+
+### Issue: Missing some messages
+
+**Cause**: Virtual scrolling or very fast scrolling  
+**Solution**: The two-phase approach should minimize this  
+**Verification**: Check console for "Found X new" messages
+
+### Issue: "Content script not ready"
+
+**Cause**: Extension loaded after page loaded  
+**Solution**: Auto-refresh feature handles this  
+**Manual**: Refresh page and try again
+
+---
+
+## Regression Testing Checklist
+
+Before releasing updates, test:
+
+- [ ] Short conversation (10 messages)
+- [ ] Long conversation (100+ messages)
+- [ ] Cancel during Phase 1
+- [ ] Cancel during Phase 2
+- [ ] Close popup during export
+- [ ] Rich formatting (lists, headings, code)
+- [ ] Unicode characters (中文, emoji)
+- [ ] Special chars in title
+- [ ] Connection error recovery
+- [ ] Grayscale icon on non-Gemini pages
+
+---
+
+## User Acceptance Criteria
+
+✅ **Functional**:
+- All messages exported (user + Gemini)
+- Formatting preserved (lists, headings, bold)
+- Correct chronological order
+- File named with conversation title
+
+✅ **UX**:
+- Real-time progress visible
+- Can close popup safely
+- Clear success/error messages
+- Cancel works reliably
+
+✅ **Performance**:
+- < 30 seconds for typical conversations
+- Progress updates every few seconds
+- No browser freezing
+
+✅ **Reliability**:
+- No data loss
+- Handles errors gracefully
+- Works with very long conversations
+
+---
+
+## Automated Testing (Future)
+
+Currently manual testing only. Potential automation:
+- **Unit tests**: Markdown conversion functions
+- **Integration tests**: Mock DOM and test collection
+- **E2E tests**: Puppeteer with test Gemini account
+
+---
+
+## Bug Report Template
+
+When reporting issues:
+
+```markdown
+**Environment**:
+- Browser: Chrome/Edge/Brave [version]
+- Extension version: 1.0.0
+- OS: Windows/Mac/Linux
+
+**Conversation Details**:
+- Approximate message count: 
+- Conversation topic:
+- Special elements: code/lists/tables/images
+
+**Expected Behavior**:
+[What should happen]
+
+**Actual Behavior**:
+[What actually happened]
+
+**Console Logs**:
+[Copy from F12 console]
+
+**Screenshots**:
+[If applicable]
+
+**Steps to Reproduce**:
+1. 
+2. 
+3. 
+```
+
+---
+
+## Success Metrics
+
+All features working as of v1.0.0:
+
+| Feature | Status | Test Coverage |
+|---------|--------|---------------|
+| Markdown export | ✅ | High |
+| Lists & formatting | ✅ | High |
+| Progress tracking | ✅ | High |
+| Cancel support | ✅ | Medium |
+| Error recovery | ✅ | Medium |
+| Long conversations | ✅ | High |
+| Unicode support | ✅ | High |
+
+**Overall Quality**: Production-ready ✅
+
+---
+
+## Next Steps After Testing
+
+1. If all tests pass → Prepare screenshots for Store
+2. If issues found → Log in GitHub Issues
+3. Minor bugs → Fix in v1.0.1
+4. Major bugs → Block publication
+
+**Current Status**: Ready for Chrome Web Store submission 🚀
