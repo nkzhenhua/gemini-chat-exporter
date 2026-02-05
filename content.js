@@ -840,38 +840,175 @@ function isUserMessage(element) {
   return false;
 }
 
+// Convert HTML element to Markdown with proper formatting
+function htmlToMarkdown(element, depth = 0) {
+  if (!element) return '';
+  
+  let markdown = '';
+  const indent = '  '.repeat(depth); // 2 spaces per nesting level
+  
+  // Process all child nodes
+  for (const node of element.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      // Text node - add as-is
+      markdown += node.textContent;
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const tag = node.tagName.toLowerCase();
+      
+      switch (tag) {
+        // Headings
+        case 'h1':
+          markdown += `\n\n# ${node.textContent.trim()}\n\n`;
+          break;
+        case 'h2':
+          markdown += `\n\n## ${node.textContent.trim()}\n\n`;
+          break;
+        case 'h3':
+          markdown += `\n\n### ${node.textContent.trim()}\n\n`;
+          break;
+        case 'h4':
+          markdown += `\n\n#### ${node.textContent.trim()}\n\n`;
+          break;
+        case 'h5':
+          markdown += `\n\n##### ${node.textContent.trim()}\n\n`;
+          break;
+        case 'h6':
+          markdown += `\n\n###### ${node.textContent.trim()}\n\n`;
+          break;
+        
+        // Lists
+        case 'ul':
+        case 'ol':
+          markdown += '\n' + processList(node, depth, tag === 'ol');
+          break;
+        
+        // Paragraphs
+        case 'p':
+          markdown += htmlToMarkdown(node, depth) + '\n\n';
+          break;
+        
+        // Line breaks
+        case 'br':
+          markdown += '\n';
+          break;
+        
+        // Bold
+        case 'strong':
+        case 'b':
+          markdown += `**${node.textContent.trim()}**`;
+          break;
+        
+        // Italic
+        case 'em':
+        case 'i':
+          markdown += `*${node.textContent.trim()}*`;
+          break;
+        
+        // Inline code
+        case 'code':
+          // Check if it's inside a <pre> (block code)
+          if (node.parentElement.tagName.toLowerCase() !== 'pre') {
+            markdown += `\`${node.textContent}\``;
+          } else {
+            // Block code handled by <pre> case below
+            markdown += node.textContent;
+          }
+          break;
+        
+        // Code blocks (already handled by existing logic, keep as-is)
+        case 'pre':
+          const codeElement = node.querySelector('code');
+          const code = codeElement ? codeElement.textContent : node.textContent;
+          const language = codeElement?.className.match(/language-(\w+)/)?.[1] || '';
+          markdown += `\n\`\`\`${language}\n${code}\n\`\`\`\n\n`;
+          break;
+        
+        // Divs and spans - recurse into children
+        case 'div':
+        case 'span':
+        case 'section':
+        case 'article':
+          markdown += htmlToMarkdown(node, depth);
+          break;
+        
+        // Default - recurse for unknown tags
+        default:
+          markdown += htmlToMarkdown(node, depth);
+      }
+    }
+  }
+  
+  return markdown;
+}
+
+// Process list (ul/ol) and its items
+function processList(listElement, depth, isNumbered) {
+  let result = '';
+  const items = listElement.querySelectorAll(':scope > li'); // Direct children only
+  
+  items.forEach((li, index) => {
+    const indent = '  '.repeat(depth);
+    const bullet = isNumbered ? `${index + 1}.` : '-';
+    
+    // Extract content, handling nested lists
+    const clone = li.cloneNode(true);
+    const nestedLists = clone.querySelectorAll('ul, ol');
+    
+    // Temporarily remove nested lists
+    const nestedListsContent = [];
+    nestedLists.forEach(list => {
+      const isNestedNumbered = list.tagName.toLowerCase() === 'ol';
+      nestedListsContent.push({
+        content: processList(list, depth + 1, isNestedNumbered),
+        placeholder: `__NESTED_LIST_${nestedListsContent.length}__`
+      });
+      list.replaceWith(document.createTextNode(nestedListsContent[nestedListsContent.length - 1].placeholder));
+    });
+    
+    // Get main content
+    let content = clone.textContent.trim();
+    
+    // Restore nested lists
+    nestedListsContent.forEach((nested, i) => {
+      content = content.replace(`__NESTED_LIST_${i}__`, `\n${nested.content}`);
+    });
+    
+    result += `${indent}${bullet} ${content}\n`;
+  });
+  
+  return result;
+}
+
 function extractMessageContent(element) {
-  // 创建元素副本以避免修改原始DOM
-  const clone = element.cloneNode(true);
-  
-  // 移除不需要的元素（如按钮、图标等）
-  const unwantedSelectors = [
-    'button',
-    '[role="button"]',
-    '.action-button',
-    '[class*="button"]',
-    'svg:not([class*="code"])'
-  ];
-  
-  unwantedSelectors.forEach(selector => {
-    clone.querySelectorAll(selector).forEach(el => el.remove());
-  });
-  
-  // 处理代码块
-  const codeBlocks = clone.querySelectorAll('pre code, pre, [class*="code-block"]');
-  codeBlocks.forEach(block => {
-    const code = block.textContent;
-    const language = block.className.match(/language-(\w+)/)?.[1] || '';
-    block.textContent = `\n\`\`\`${language}\n${code}\n\`\`\`\n`;
-  });
-  
-  // 获取文本内容
-  let content = clone.textContent || clone.innerText || '';
-  
-  // 清理多余的空白
-  content = content.replace(/\n{3,}/g, '\n\n').trim();
-  
-  return content;
+  try {
+    // Create element clone to avoid modifying original DOM
+    const clone = element.cloneNode(true);
+    
+    // Remove unwanted elements (buttons, icons, etc.)
+    const unwantedSelectors = [
+      'button',
+      '[role="button"]',
+      '.action-button',
+      '[class*="button"]',
+      'svg:not([class*="code"])'
+    ];
+    
+    unwantedSelectors.forEach(selector => {
+      clone.querySelectorAll(selector).forEach(el => el.remove());
+    });
+    
+    // Convert HTML to Markdown
+    let content = htmlToMarkdown(clone);
+    
+    // Clean up excessive newlines (more than 2 in a row)
+    content = content.replace(/\n{3,}/g, '\n\n').trim();
+    
+    return content;
+  } catch (error) {
+    // Fallback to plain text if conversion fails
+    console.warn('Markdown conversion failed, using plain text', error);
+    return element.textContent || element.innerText || '';
+  }
 }
 
 function downloadMarkdown(content, title = 'gemini-chat') {
