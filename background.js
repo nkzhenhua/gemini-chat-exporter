@@ -17,9 +17,9 @@ function updateIcon(tabId, url) {
     chrome.action.setIcon({
       tabId: tabId,
       path: {
-        "16": "favicon-16x16.png",
-        "48": "android-icon-48x48.png",
-        "128": "android-icon-144x144.png"
+        "16": "icons/favicon-16x16.png",
+        "48": "icons/android-icon-48x48.png",
+        "128": "icons/android-icon-144x144.png"
       }
     });
     chrome.action.setTitle({
@@ -32,9 +32,9 @@ function updateIcon(tabId, url) {
     chrome.action.setIcon({
       tabId: tabId,
       path: {
-        "16": "favicon-16x16-grayscale.png",
-        "48": "android-icon-48x48-grayscale.png",
-        "128": "android-icon-144x144-grayscale.png"
+        "16": "icons/favicon-16x16-grayscale.png",
+        "48": "icons/android-icon-48x48-grayscale.png",
+        "128": "icons/android-icon-144x144-grayscale.png"
       }
     });
     chrome.action.setTitle({

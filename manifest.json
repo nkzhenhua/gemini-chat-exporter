@@ -3,8 +3,8 @@
   "name": "Gemini Chat Exporter",
   "version": "1.0.0",
   "description": "Export Google Gemini conversations to beautifully formatted Markdown files with real-time progress tracking and cancel support",
-  "author": "Your Name",
-  "homepage_url": "https://github.com/yourusername/gemini-exporter",
+  "author": "zhenhua zhang",
+  "homepage_url": "https://github.com/nkzhenhua/gemini-exporter",
   "permissions": [
     "activeTab",
     "scripting",
@@ -16,15 +16,15 @@
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
-      "16": "favicon-16x16.png",
-      "48": "android-icon-48x48.png",
-      "128": "android-icon-144x144.png"
+      "16": "icons/favicon-16x16.png",
+      "48": "icons/android-icon-48x48.png",
+      "128": "icons/android-icon-144x144.png"
     }
   },
   "icons": {
-    "16": "favicon-16x16.png",
-    "48": "android-icon-48x48.png",
-    "128": "android-icon-144x144.png"
+    "16": "icons/favicon-16x16.png",
+    "48": "icons/android-icon-48x48.png",
+    "128": "icons/android-icon-144x144.png"
   },
   "content_scripts": [
     {

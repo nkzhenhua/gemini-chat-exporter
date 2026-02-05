@@ -10,13 +10,7 @@ $filesToCopy = @(
     "content.js",
     "popup.html",
     "popup.js",
-    "popup.css",
-    "favicon-16x16.png",
-    "favicon-16x16-grayscale.png",
-    "android-icon-48x48.png",
-    "android-icon-48x48-grayscale.png",
-    "android-icon-144x144.png",
-    "android-icon-144x144-grayscale.png"
+    "popup.css"
 )
 
 # Copy files to dist
@@ -28,6 +22,14 @@ foreach ($file in $filesToCopy) {
     } else {
         Write-Host "  ✗ Warning: $file not found" -ForegroundColor Yellow
     }
+}
+
+# Copy icons directory
+if (Test-Path "icons") {
+    Copy-Item -Path "icons" -Destination ".\dist\" -Recurse -Force
+    Write-Host "  ✓ icons/" -ForegroundColor Gray
+} else {
+    Write-Host "  ✗ Warning: icons/ directory not found" -ForegroundColor Yellow
 }
 
 # Create zip file

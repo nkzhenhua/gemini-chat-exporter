@@ -51,13 +51,13 @@ We may update this privacy policy from time to time. Any changes will be posted 
 ## Open Source
 
 This extension is open source. You can review the complete source code at:
-[GitHub Repository URL - to be added]
+[ github: gemini-chat-exporter](https://github.com/nkzhenhua/gemini-chat-exporter)
 
 ## Contact
 
 If you have questions about this privacy policy, please contact:
-- GitHub Issues: [Repository URL]
-- Email: [Your email]
+- GitHub Issues: [https://github.com/nkzhenhua/gemini-chat-exporter/issues](https://github.com/nkzhenhua/gemini-chat-exporter/issues)
+- Email: [nkzhenhua@gmail.com]
 
 ## Your Rights
 
