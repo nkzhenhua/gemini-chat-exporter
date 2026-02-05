@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Chat Exporter</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>💬 Gemini Chat Exporter</h1>
+    <p class="description">Click the button below to export the current conversation as a Markdown file</p>
+    
+    <div id="status" class="status hidden">
+      <div class="spinner"></div>
+      <span id="statusText">Processing...</span>
+    </div>
+    
+    <div id="error" class="error hidden"></div>
+    
+    <button id="exportBtn" class="export-btn">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10 14L6 10H8V4H12V10H14L10 14Z" fill="currentColor"/>
+        <path d="M16 16H4V18H16V16Z" fill="currentColor"/>
+      </svg>
+      Download Chat
+    </button>
+    
+    <div class="footer">
+      <small>Works on gemini.google.com only</small>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
