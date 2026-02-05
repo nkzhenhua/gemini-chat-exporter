@@ -73,30 +73,6 @@ The extension shows a floating progress overlay on the Gemini page:
 - Message count
 - Cancel button
 
-### Export Format Example
-
-**Before (Gemini HTML):**
-```
-五、最终建议 不要被 LULU 的"低 PE"骗了...
-```
-
-**After (Exported Markdown):**
-```markdown
-## 五、最终建议
-
-不要被 LULU 的"低 PE"骗了。在消费股里，低 PE 往往意味着"过气"。
-
-回到你的投资组合（Amazon/Google/BABA/DIDI/JD）：
-
-- 你已经有了足够的**"困境反转"**仓位（满滴、BABA）。
-- 你不需要再加一个**"基本面正在恶化"**的美国消费股。
-
-### 坚定的操作指令：
-
-1. 忘记 LULU：让华尔街去博弈它的死活。
-2. 买入安踏：在这个位置（13倍 PE），你买入的是一个正在上升期、拥有全球顶级资产组合...
-```
-
 ## 🛠️ Technical Details
 
 ### Architecture
@@ -108,7 +84,7 @@ gemini-exporter/
 ├── popup.js               # Popup logic & progress display
 ├── popup.css              # Popup styles
 ├── content.js             # Main export logic & markdown conversion
-├── *.png                  # Extension icons (colored + grayscale)
+├── icons/                 # Extension icons (colored + grayscale)
 ├── PRIVACY.md             # Privacy policy
 ├── STORE_DESCRIPTION.md   # Chrome Web Store listing text
 └── README.md              # This file
