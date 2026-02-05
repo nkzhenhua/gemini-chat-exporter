@@ -1,16 +1,290 @@
+// Global flag for cancellation
+let exportCancelled = false;
+
+// Progress reporting function
+function reportProgress(phase, detail, percent, messageCount) {
+  try {
+    chrome.runtime.sendMessage({
+      type: 'exportProgress',
+      phase: phase,
+      detail: detail,
+      percent: percent,
+      messageCount: messageCount
+    }, () => {
+      // Ignore errors if popup is closed
+      if (chrome.runtime.lastError) {
+        // Silently ignore - popup might be closed
+      }
+    });
+  } catch (error) {
+    // Silently fail - don't block the export
+    console.log('Progress report failed (popup may be closed):', error);
+  }
+  
+  // Also update on-page overlay
+  updateOnPageProgress(phase, detail, percent, messageCount);
+}
+
+// Create on-page progress overlay
+function createProgressOverlay() {
+  // Remove existing overlay if any
+  const existing = document.getElementById('gemini-export-overlay');
+  if (existing) {
+    existing.remove();
+  }
+  
+  const overlay = document.createElement('div');
+  overlay.id = 'gemini-export-overlay';
+  overlay.innerHTML = `
+    <div style="
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 320px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      z-index: 999999;
+      font-family: 'Segoe UI', sans-serif;
+      color: white;
+    ">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+        <div style="font-size: 24px;">⚠️</div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 14px;">Exporting Chat</div>
+          <div style="font-size: 11px; opacity: 0.9;">Don't close or refresh this tab</div>
+        </div>
+        <button id="gemini-export-cancel" style="
+          background: rgba(255, 255, 255, 0.25);
+          border: 1px solid rgba(255, 255, 255, 0.4);
+          color: white;
+          padding: 6px 12px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
+          font-weight: 600;
+          transition: all 0.2s;
+        ">Cancel</button>
+      </div>
+      
+      <div style="
+        width: 100%;
+        height: 6px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 3px;
+        overflow: hidden;
+        margin-bottom: 8px;
+      ">
+        <div id="gemini-export-bar" style="
+          height: 100%;
+          background: linear-gradient(90deg, #4CAF50, #8BC34A);
+          border-radius: 3px;
+          transition: width 0.3s ease;
+          width: 0%;
+          box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+        "></div>
+      </div>
+      
+      <div id="gemini-export-phase" style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">
+        Initializing...
+      </div>
+      <div id="gemini-export-detail" style="font-size: 12px; opacity: 0.9; margin-bottom: 4px;">
+      </div>
+      <div id="gemini-export-count" style="font-size: 12px; opacity: 0.85;">
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(overlay);
+  
+  // Add cancel button handler
+  const cancelBtn = document.getElementById('gemini-export-cancel');
+  cancelBtn.addEventListener('click', () => {
+    exportCancelled = true;
+    overlay.innerHTML = `
+      <div style="
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 320px;
+        background: linear-gradient(135deg, #FF9800, #FF5722);
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        z-index: 999999;
+        font-family: 'Segoe UI', sans-serif;
+        color: white;
+      ">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <div style="font-size: 28px;">🚫</div>
+          <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">Export Cancelled</div>
+            <div style="font-size: 12px;">Export was stopped by user</div>
+          </div>
+          <button onclick="this.closest('div').parentElement.remove()" style="
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+          ">×</button>
+        </div>
+      </div>
+    `;
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      const overlay = document.getElementById('gemini-export-overlay');
+      if (overlay) {
+        overlay.style.transition = 'opacity 0.5s ease';
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.remove(), 500);
+      }
+    }, 5000);
+  });
+  
+  return overlay;
+}
+
+// Update on-page progress
+function updateOnPageProgress(phase, detail, percent, messageCount) {
+  let overlay = document.getElementById('gemini-export-overlay');
+  if (!overlay) {
+    overlay = createProgressOverlay();
+  }
+  
+  const bar = document.getElementById('gemini-export-bar');
+  const phaseEl = document.getElementById('gemini-export-phase');
+  const detailEl = document.getElementById('gemini-export-detail');
+  const countEl = document.getElementById('gemini-export-count');
+  
+  if (bar) bar.style.width = percent + '%';
+  if (phaseEl) phaseEl.textContent = phase || '';
+  if (detailEl) detailEl.textContent = detail || '';
+  if (countEl && messageCount !== undefined && messageCount > 0) {
+    countEl.textContent = `Collected: ${messageCount} messages`;
+  }
+}
+
+// Show success on page
+function showOnPageSuccess(messageCount, userCount, geminiCount, filename, elapsed) {
+  const overlay = document.getElementById('gemini-export-overlay');
+  if (!overlay) return;
+  
+  overlay.innerHTML = `
+    <div style="
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 320px;
+      background: linear-gradient(135deg, #4CAF50, #66BB6A);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      z-index: 999999;
+      font-family: 'Segoe UI', sans-serif;
+      color: white;
+    ">
+      <div style="display: flex; align-items: flex-start; gap: 12px;">
+        <div style="font-size: 28px;">✅</div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 8px;">Export Successful!</div>
+          <div style="font-size: 12px; line-height: 1.6;">
+            • Messages: ${messageCount} (${userCount} user + ${geminiCount} Gemini)<br>
+            • File: ${filename}<br>
+            • Time: ${elapsed}s
+          </div>
+        </div>
+        <button onclick="this.closest('div').parentElement.remove()" style="
+          background: rgba(255, 255, 255, 0.2);
+          border: none;
+          color: white;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          cursor: pointer;
+          font-size: 18px;
+        ">×</button>
+      </div>
+    </div>
+  `;
+  
+  // Auto-hide after 10 seconds
+  setTimeout(() => {
+    const overlay = document.getElementById('gemini-export-overlay');
+    if (overlay) {
+      overlay.style.transition = 'opacity 0.5s ease';
+      overlay.style.opacity = '0';
+      setTimeout(() => overlay.remove(), 500);
+    }
+  }, 10000);
+}
+
+// Show error on page
+function showOnPageError(errorMessage) {
+  const overlay = document.getElementById('gemini-export-overlay');
+  if (!overlay) return;
+  
+  overlay.innerHTML = `
+    <div style="
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 320px;
+      background: linear-gradient(135deg, #ef5350, #e57373);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      z-index: 999999;
+      font-family: 'Segoe UI', sans-serif;
+      color: white;
+    ">
+      <div style="display: flex; align-items: flex-start; gap: 12px;">
+        <div style="font-size: 28px;">❌</div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">Export Failed</div>
+          <div style="font-size: 12px;">${errorMessage}</div>
+        </div>
+        <button onclick="this.closest('div').parentElement.remove()" style="
+          background: rgba(255, 255, 255, 0.2);
+          border: none;
+          color: white;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          cursor: pointer;
+          font-size: 18px;
+        ">×</button>
+      </div>
+    </div>
+  `;
+}
+
 // 监听来自popup的消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'exportChat') {
     exportChatToMarkdown()
-      .then(() => sendResponse({ success: true }))
+      .then((result) => sendResponse({ 
+        success: true,
+        messageCount: result.messageCount,
+        userCount: result.userCount,
+        geminiCount: result.geminiCount,
+        filename: result.filename
+      }))
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true; // 保持消息通道开放以进行异步响应
   }
 });
 
 async function exportChatToMarkdown() {
+  const startTime = Date.now();
+  exportCancelled = false; // Reset cancellation flag
   try {
     console.log('Starting chat export...');
+    reportProgress('Starting export...', 'Initializing', 0, 0);
     
     // Get conversation title
     const title = getConversationTitle();
@@ -20,13 +294,43 @@ async function exportChatToMarkdown() {
     // Collect messages while scrolling to avoid loss from virtual scrolling
     const messages = await scrollAndCollectMessages();
     
+    // Check if cancelled after scrolling
+    if (exportCancelled) {
+      throw new Error('Export cancelled by user');
+    }
+    
     console.log(`Collected ${messages.length} messages in total`);
     
+    // Count user vs Gemini messages
+    let userCount = 0;
+    let geminiCount = 0;
+    messages.forEach(msg => {
+      if (msg.author === 'User') userCount++;
+      else geminiCount++;
+    });
+    
     // Convert to Markdown and download
+    reportProgress('Generating file...', 'Creating markdown', 95, messages.length);
     const markdown = convertToMarkdown(messages, title);
     downloadMarkdown(markdown, title);
+    
+    reportProgress('Complete!', 'File downloaded', 100, messages.length);
+    
+    // Calculate elapsed time from function start
+    const elapsed = Math.round((Date.now() - startTime) / 1000);
+    
+    // Show success on page
+    showOnPageSuccess(messages.length, userCount, geminiCount, title + '.md', elapsed);
+    
+    return {
+      messageCount: messages.length,
+      userCount: userCount,
+      geminiCount: geminiCount,
+      filename: title + '.md'
+    };
   } catch (error) {
     console.error('Export failed:', error);
+    showOnPageError(error.message || 'Unknown error occurred');
     throw error;
   }
 }
@@ -102,6 +406,7 @@ async function scrollAndCollectMessages() {
   
   // ========== PHASE 1: Scroll to load all content ==========
   console.log('Phase 1: Scrolling through conversation to load all content...');
+  reportProgress('Phase 1/2: Loading content', 'Scrolling to bottom...', 5, 0);
   
   // First scroll to bottom to trigger loading
   chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -113,7 +418,7 @@ async function scrollAndCollectMessages() {
   let attempts = 0;
   const maxAttempts = 200;
   
-  while (currentScrollPos > 0 && attempts < maxAttempts) {
+  while (currentScrollPos > 0 && attempts < maxAttempts && !exportCancelled) {
     currentScrollPos = Math.max(0, currentScrollPos - scrollStep);
     chatContainer.scrollTop = currentScrollPos;
     await sleep(300);
@@ -125,17 +430,27 @@ async function scrollAndCollectMessages() {
       console.log(`[Load] Height updated to ${totalHeight}`);
     }
     
-    if (attempts % 20 === 0) {
+    if (attempts % 10 === 0) {
+      const progress = Math.round((1 - currentScrollPos / totalHeight) * 40) + 5; // 5-45%
+      reportProgress('Phase 1/2: Loading content', `Scrolling (${attempts}/${maxAttempts})`, progress, 0);
       console.log(`[Load] Scroll position: ${currentScrollPos}/${totalHeight}`);
     }
   }
   
+  // Check if cancelled
+  if (exportCancelled) {
+    console.log('Export cancelled during Phase 1');
+    return [];
+  }
+  
   // Wait for any final loading
   await waitForLoading();
+  reportProgress('Phase 1/2: Complete', 'All content loaded', 45, 0);
   console.log('Phase 1 complete: All content should be loaded.');
   
   // ========== PHASE 2: Collect in order from top to bottom ==========
   console.log('Phase 2: Collecting messages in order from top to bottom...');
+  reportProgress('Phase 2/2: Collecting messages', 'Starting from top...', 50, 0);
   
   // Scroll to top first
   chatContainer.scrollTop = 0;
@@ -198,7 +513,7 @@ async function scrollAndCollectMessages() {
   currentScrollPos = 0;
   attempts = 0;
   
-  while (currentScrollPos <= totalHeight && attempts < maxAttempts) {
+  while (currentScrollPos <= totalHeight && attempts < maxAttempts && !exportCancelled) {
     chatContainer.scrollTop = currentScrollPos;
     await sleep(250);
     
@@ -207,8 +522,20 @@ async function scrollAndCollectMessages() {
       console.log(`[Collect] Position: ${currentScrollPos}, Found ${newCount} new. Total: ${orderedMessages.length}`);
     }
     
+    // Report progress every 5 attempts
+    if (attempts % 5 === 0) {
+      const progress = Math.round((currentScrollPos / totalHeight) * 40) + 50; // 50-90%
+      reportProgress('Phase 2/2: Collecting messages', `Position: ${currentScrollPos}/${totalHeight}`, progress, orderedMessages.length);
+    }
+    
     currentScrollPos += scrollStep;
     attempts++;
+  }
+  
+  // Check if cancelled
+  if (exportCancelled) {
+    console.log('Export cancelled during Phase 2');
+    return [];
   }
   
   // Final collection at bottom
@@ -216,6 +543,7 @@ async function scrollAndCollectMessages() {
   await sleep(300);
   collectInOrder();
   
+  reportProgress('Phase 2/2: Complete', 'All messages collected', 90, orderedMessages.length);
   console.log(`✓ Collection complete. Total messages: ${orderedMessages.length}`);
   
   return orderedMessages;

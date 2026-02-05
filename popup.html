@@ -10,12 +10,38 @@
   <div class="container">
     <h1>💬 Gemini Chat Exporter</h1>
     
+    <!-- Warning box shown during export -->
+    <div id="warningBox" class="warning-box hidden">
+      <div class="warning-icon">⚠️</div>
+      <div class="warning-content">
+        <strong>Export in progress</strong>
+        <small>Don't close, refresh, or switch conversations</small>
+      </div>
+    </div>
+    
+    <!-- Progress display -->
+    <div id="progressBox" class="progress-box hidden">
+      <div class="progress-bar-container">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+      <div id="progressPhase" class="progress-phase">Initializing...</div>
+      <div id="progressDetail" class="progress-detail"></div>
+      <div id="messageCount" class="message-count"></div>
+    </div>
+    
+    <!-- Old status div (keeping for compatibility) -->
     <div id="status" class="status hidden">
       <div class="spinner"></div>
       <span id="statusText">Processing...</span>
     </div>
     
     <div id="error" class="error hidden"></div>
+    
+    <!-- Success box with details -->
+    <div id="successBox" class="success-box hidden">
+      <div class="success-icon">✅</div>
+      <div id="successDetails"></div>
+    </div>
     
     <button id="exportBtn" class="export-btn">
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">

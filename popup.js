@@ -3,6 +3,23 @@ document.addEventListener('DOMContentLoaded', function() {
   const statusDiv = document.getElementById('status');
   const statusText = document.getElementById('statusText');
   const errorDiv = document.getElementById('error');
+  const warningBox = document.getElementById('warningBox');
+  const progressBox = document.getElementById('progressBox');
+  const progressBar = document.getElementById('progressBar');
+  const progressPhase = document.getElementById('progressPhase');
+  const progressDetail = document.getElementById('progressDetail');
+  const messageCount = document.getElementById('messageCount');
+  const successBox = document.getElementById('successBox');
+  const successDetails = document.getElementById('successDetails');
+  
+  let exportStartTime = null;
+
+  // Listen for progress messages from content script
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'exportProgress') {
+      updateProgressDisplay(message);
+    }
+  });
 
   // Try to get and display the conversation title when popup opens
   chrome.tabs.query({ active: true, currentWindow: true }, async function(tabs) {
@@ -61,7 +78,12 @@ document.addEventListener('DOMContentLoaded', function() {
   exportBtn.addEventListener('click', async function() {
     try {
       hideError();
-      showStatus('Loading all messages...\nThis may take 1-2 minutes.\nCheck Console (F12) for progress.');
+      hideSuccess();
+      exportStartTime = Date.now();
+      
+      // Show warning and progress UI
+      showWarning();
+      showProgress();
       exportBtn.disabled = true;
 
       // Get current active tab
@@ -71,11 +93,16 @@ document.addEventListener('DOMContentLoaded', function() {
       chrome.tabs.sendMessage(tab.id, { action: 'exportChat' }, function(response) {
         if (chrome.runtime.lastError) {
           // Content script not available - refresh the page and retry
-          showStatus('Content script not ready. Refreshing page...');
+          updateProgressDisplay({
+            phase: 'Refreshing page...',
+            detail: 'Content script not ready',
+            percent: 0
+          });
           chrome.tabs.reload(tab.id, {}, function() {
             // Wait for page to reload
             setTimeout(() => {
-              hideStatus();
+              hideWarning();
+              hideProgress();
               showError('Page refreshed. Please click the button again to export.');
               exportBtn.disabled = false;
             }, 2000);
@@ -84,23 +111,94 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         if (response && response.success) {
-          showStatus('Export successful!\nFile has been downloaded.');
+          const elapsed = Math.round((Date.now() - exportStartTime) / 1000);
+          showSuccess({
+            messageCount: response.messageCount || 0,
+            userCount: response.userCount || 0,
+            geminiCount: response.geminiCount || 0,
+            filename: response.filename || 'file',
+            elapsed: elapsed
+          });
+          hideWarning();
+          hideProgress();
           setTimeout(() => {
-            hideStatus();
             exportBtn.disabled = false;
           }, 3000);
         } else {
           showError(response?.error || 'Export failed. Please try again.');
+          hideWarning();
+          hideProgress();
           exportBtn.disabled = false;
-          hideStatus();
         }
       });
     } catch (error) {
       showError('Error: ' + error.message);
+      hideWarning();
+      hideProgress();
       exportBtn.disabled = false;
-      hideStatus();
     }
   });
+
+  function updateProgressDisplay(data) {
+    // Update progress bar
+    if (data.percent !== undefined) {
+      progressBar.style.width = data.percent + '%';
+    }
+    
+    // Update phase text
+    if (data.phase) {
+      progressPhase.textContent = data.phase;
+    }
+    
+    // Update detail text
+    if (data.detail) {
+      progressDetail.textContent = data.detail;
+    }
+    
+    // Update message count
+    if (data.messageCount !== undefined) {
+      messageCount.textContent = `Collected: ${data.messageCount} messages`;
+    }
+  }
+
+  function showWarning() {
+    warningBox.classList.remove('hidden');
+  }
+
+  function hideWarning() {
+    warningBox.classList.add('hidden');
+  }
+
+  function showProgress() {
+    progressBox.classList.remove('hidden');
+    progressBar.style.width = '0%';
+    progressPhase.textContent = 'Initializing...';
+    progressDetail.textContent = '';
+    messageCount.textContent = '';
+  }
+
+  function hideProgress() {
+    progressBox.classList.add('hidden');
+  }
+
+  function showSuccess(data) {
+    successBox.classList.remove('hidden');
+    
+    const userCount = data.userCount || 0;
+    const geminiCount = data.geminiCount || 0;
+    const total = data.messageCount || (userCount + geminiCount);
+    
+    successDetails.innerHTML = `
+      <strong>Export successful!</strong>
+      <div>• Messages: ${total} (${userCount} user + ${geminiCount} Gemini)</div>
+      <div>• File: ${data.filename}</div>
+      <div>• Time: ${data.elapsed}s</div>
+    `;
+  }
+
+  function hideSuccess() {
+    successBox.classList.add('hidden');
+  }
 
   function showStatus(message) {
     statusText.textContent = message;
