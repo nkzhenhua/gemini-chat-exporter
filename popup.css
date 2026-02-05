@@ -46,6 +46,13 @@ h1 {
   justify-content: center;
   gap: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.export-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .export-btn:hover {

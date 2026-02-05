@@ -39,7 +39,12 @@ document.addEventListener('DOMContentLoaded', function() {
       });
       
       if (results && results[0] && results[0].result) {
-        const title = results[0].result;
+        let title = results[0].result;
+        // Truncate long titles to prevent wrapping
+        const maxLength = 20;
+        if (title.length > maxLength) {
+          title = title.substring(0, maxLength) + '...';
+        }
         // Update button text to show title
         const btnIcon = exportBtn.querySelector('svg');
         exportBtn.innerHTML = '';
@@ -65,9 +70,16 @@ document.addEventListener('DOMContentLoaded', function() {
       // Send message to content script
       chrome.tabs.sendMessage(tab.id, { action: 'exportChat' }, function(response) {
         if (chrome.runtime.lastError) {
-          showError('Unable to connect to page. Please refresh and try again.');
-          exportBtn.disabled = false;
-          hideStatus();
+          // Content script not available - refresh the page and retry
+          showStatus('Content script not ready. Refreshing page...');
+          chrome.tabs.reload(tab.id, {}, function() {
+            // Wait for page to reload
+            setTimeout(() => {
+              hideStatus();
+              showError('Page refreshed. Please click the button again to export.');
+              exportBtn.disabled = false;
+            }, 2000);
+          });
           return;
         }
 
