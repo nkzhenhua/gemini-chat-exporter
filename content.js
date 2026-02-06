@@ -408,32 +408,33 @@ async function scrollAndCollectMessages() {
   console.log('Phase 1: Scrolling through conversation to load all content...');
   reportProgress('Phase 1/2: Loading content', 'Scrolling to bottom...', 5, 0);
   
-  // First scroll to bottom to trigger loading
+  // First scroll to bottom to trigger loading - minimal wait if already there
   chatContainer.scrollTop = chatContainer.scrollHeight;
-  await sleep(1500);
-  await waitForLoading();
+  await sleep(500); // Reduced from 1500ms
+  await waitForLoading(2000); // Quick check only for initial bottom load
   
   // Scroll from bottom to top to load all content
   let currentScrollPos = chatContainer.scrollHeight;
   let attempts = 0;
-  const maxAttempts = 200;
+  const maxAttempts = 500; 
+  
+  // Speed up Phase 1: Scroll in larger chunks and faster
+  const fastScrollStep = viewportHeight * 1.5; 
   
   while (currentScrollPos > 0 && attempts < maxAttempts && !exportCancelled) {
-    currentScrollPos = Math.max(0, currentScrollPos - scrollStep);
+    currentScrollPos = Math.max(0, currentScrollPos - fastScrollStep);
     chatContainer.scrollTop = currentScrollPos;
-    await sleep(300);
+    await sleep(150); // Faster delay for loading phase
     attempts++;
     
     // Update total height in case more content loaded
     if (chatContainer.scrollHeight > totalHeight) {
       totalHeight = chatContainer.scrollHeight;
-      console.log(`[Load] Height updated to ${totalHeight}`);
     }
     
-    if (attempts % 10 === 0) {
-      const progress = Math.round((1 - currentScrollPos / totalHeight) * 40) + 5; // 5-45%
-      reportProgress('Phase 1/2: Loading content', `Scrolling (${attempts}/${maxAttempts})`, progress, 0);
-      console.log(`[Load] Scroll position: ${currentScrollPos}/${totalHeight}`);
+    if (attempts % 5 === 0) {
+      const progress = Math.round((1 - currentScrollPos / totalHeight) * 40) + 5;
+      reportProgress('Phase 1/2: Loading content', `Fast-scanning history (Step ${attempts})`, progress, 0);
     }
   }
   
@@ -513,9 +514,12 @@ async function scrollAndCollectMessages() {
   currentScrollPos = 0;
   attempts = 0;
   
+  // Speed up Phase 2: Larger steps and faster timing
+  const collectionStep = viewportHeight * 0.8; 
+  
   while (currentScrollPos <= totalHeight && attempts < maxAttempts && !exportCancelled) {
     chatContainer.scrollTop = currentScrollPos;
-    await sleep(250);
+    await sleep(200); // Slightly faster collection trigger
     
     const newCount = collectInOrder();
     if (newCount > 0) {
@@ -525,10 +529,10 @@ async function scrollAndCollectMessages() {
     // Report progress every 5 attempts
     if (attempts % 5 === 0) {
       const progress = Math.round((currentScrollPos / totalHeight) * 40) + 50; // 50-90%
-      reportProgress('Phase 2/2: Collecting messages', `Position: ${currentScrollPos}/${totalHeight}`, progress, orderedMessages.length);
+      reportProgress('Phase 2/2: Collecting messages', `Scanning...`, progress, orderedMessages.length);
     }
     
-    currentScrollPos += scrollStep;
+    currentScrollPos += collectionStep;
     attempts++;
   }
   
@@ -550,19 +554,17 @@ async function scrollAndCollectMessages() {
 }
 
 // Wait for any loading indicators to disappear
-async function waitForLoading(maxWait = 30000) {  // Increased timeout to 30 seconds
+async function waitForLoading(maxWait = 8000) {  // Reduced from 30s to 8s
   const startTime = Date.now();
   
   while (Date.now() - startTime < maxWait) {
-    // Check for common loading indicators
-    const spinners = document.querySelectorAll('[role="progressbar"], .loading, .spinner, [class*="loading"], [class*="spinner"]');
+    // Check for common loading indicators ONLY within the plausible container area if possible
+    const spinners = document.querySelectorAll('infinite-scroller [role="progressbar"], infinite-scroller .loading, infinite-scroller .spinner');
     
-    // If no spinners found, we're done
     if (spinners.length === 0) {
       return;
     }
     
-    // Check if any spinners are visible
     let hasVisibleSpinner = false;
     spinners.forEach(spinner => {
       const style = window.getComputedStyle(spinner);
@@ -571,16 +573,9 @@ async function waitForLoading(maxWait = 30000) {  // Increased timeout to 30 sec
       }
     });
     
-    if (!hasVisibleSpinner) {
-      return;
-    }
-    
-    // Still loading, wait a bit
+    if (!hasVisibleSpinner) return;
     await sleep(200);
   }
-  
-  // Timeout reached, continue anyway
-  console.log('[waitForLoading] Timeout reached, continuing...');
 }
 
 function collectVisibleMessages(messagesMap, chatContainer) {
