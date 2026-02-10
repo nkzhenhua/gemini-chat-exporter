@@ -2,7 +2,7 @@
 
 A Chrome extension to export Google Gemini chat conversations to beautifully formatted Markdown files with real-time progress tracking.
 
-[![Chrome Web Store](https://img.shields.io/badge/Chrome-Web%20Store-blue)](https://chrome.google.com/webstore)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome-Web%20Store-blue)](https://chromewebstore.google.com/detail/gemini-chat-exporter/jeljphodifjgpkcplmjcophjbbnkmmfn)
 [![MIT License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ## ✨ Features
@@ -35,7 +35,7 @@ A Chrome extension to export Google Gemini chat conversations to beautifully for
 ## 🚀 Installation
 
 ### From Chrome Web Store
-*Coming soon - link will be added after publication*
+[**Install directly from Chrome Web Store**](https://chromewebstore.google.com/detail/gemini-chat-exporter/jeljphodifjgpkcplmjcophjbbnkmmfn)
 
 ### Manual Installation (Development)
 1. Download or clone this repository
