@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Gemini Chat Exporter",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Export Google Gemini conversations to beautifully formatted Markdown files with real-time progress tracking and cancel support",
   "author": "zhenhua zhang",
   "homepage_url": "https://github.com/nkzhenhua/gemini-exporter",
