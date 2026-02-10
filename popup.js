@@ -1,3 +1,6 @@
+const BUG_REPORT_URL = 'https://github.com/nkzhenhua/gemini-chat-exporter/issues/new?template=bug_report.md';
+const FEATURE_REQUEST_URL = 'https://github.com/nkzhenhua/gemini-chat-exporter/issues/new?template=feature_request.md';
+
 document.addEventListener('DOMContentLoaded', function() {
   const exportBtn = document.getElementById('exportBtn');
   const statusDiv = document.getElementById('status');
@@ -216,5 +219,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function hideError() {
     errorDiv.classList.add('hidden');
+  }
+
+  // Feedback link handlers
+  const reportBugLink = document.getElementById('reportBugLink');
+  if (reportBugLink) {
+    reportBugLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      chrome.tabs.create({ url: BUG_REPORT_URL });
+    });
+  }
+
+  const featureRequestLink = document.getElementById('featureRequestLink');
+  if (featureRequestLink) {
+    featureRequestLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      chrome.tabs.create({ url: FEATURE_REQUEST_URL });
+    });
   }
 });
