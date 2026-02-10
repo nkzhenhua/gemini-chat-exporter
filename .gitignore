@@ -14,3 +14,6 @@ Thumbs.db
 # Package files (if any)
 node_modules/
 package-lock.json
+
+# Build artifacts
+dist/
