@@ -217,4 +217,13 @@ document.addEventListener('DOMContentLoaded', function() {
   function hideError() {
     errorDiv.classList.add('hidden');
   }
+
+  // Feedback link handler
+  const feedbackLink = document.getElementById('feedbackLink');
+  if (feedbackLink) {
+    feedbackLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      chrome.tabs.create({ url: 'https://github.com/nkzhenhua/gemini-chat-exporter/issues' });
+    });
+  }
 });
