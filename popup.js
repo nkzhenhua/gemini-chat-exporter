@@ -218,12 +218,20 @@ document.addEventListener('DOMContentLoaded', function() {
     errorDiv.classList.add('hidden');
   }
 
-  // Feedback link handler
-  const feedbackLink = document.getElementById('feedbackLink');
-  if (feedbackLink) {
-    feedbackLink.addEventListener('click', function(e) {
+  // Feedback link handlers
+  const reportBugLink = document.getElementById('reportBugLink');
+  if (reportBugLink) {
+    reportBugLink.addEventListener('click', function(e) {
       e.preventDefault();
-      chrome.tabs.create({ url: 'https://github.com/nkzhenhua/gemini-chat-exporter/issues' });
+      chrome.tabs.create({ url: 'https://github.com/nkzhenhua/gemini-chat-exporter/issues/new?template=bug_report.md' });
+    });
+  }
+
+  const featureRequestLink = document.getElementById('featureRequestLink');
+  if (featureRequestLink) {
+    featureRequestLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      chrome.tabs.create({ url: 'https://github.com/nkzhenhua/gemini-chat-exporter/issues/new?template=feature_request.md' });
     });
   }
 });
