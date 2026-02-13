@@ -30,6 +30,47 @@ h1 {
   line-height: 1.5;
 }
 
+/* Format Selector */
+.format-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.format-option {
+  flex: 1;
+  cursor: pointer;
+}
+
+.format-option input[type="radio"] {
+  display: none;
+}
+
+.format-label {
+  display: block;
+  text-align: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  transition: all 0.2s ease;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.format-label:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.format-option input[type="radio"]:checked + .format-label {
+  background: rgba(255, 255, 255, 0.92);
+  color: #667eea;
+  font-weight: 600;
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
 .export-btn {
   width: 100%;
   padding: 12px 20px;
