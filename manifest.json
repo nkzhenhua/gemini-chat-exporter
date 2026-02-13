@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Gemini Chat Exporter",
   "version": "1.1.0",
-  "description": "Export Google Gemini conversations to Markdown or Printable HTML with real-time progress tracking and cancel support",
+  "description": "Export Google Gemini conversations to Printable HTML or Markdown with real-time progress tracking",
   "author": "zhenhua zhang",
   "homepage_url": "https://github.com/nkzhenhua/gemini-exporter",
   "permissions": [

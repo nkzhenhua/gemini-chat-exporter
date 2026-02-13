@@ -65,6 +65,8 @@ A Chrome extension to export Google Gemini chat conversations to beautifully for
 
 ## 📸 Preview
 
+![Extension Popup](screenshot/screenshort.png)
+
 ### On-Page Progress Display
 The extension shows a floating progress overlay on the Gemini page:
 - Purple gradient background
