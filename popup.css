@@ -43,7 +43,7 @@ h1 {
 }
 
 .format-option input[type="radio"] {
-  display: none;
+  accent-color: #667eea;
 }
 
 .format-label {
