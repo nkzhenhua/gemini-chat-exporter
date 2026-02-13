@@ -266,7 +266,8 @@ function showOnPageError(errorMessage) {
 // 监听来自popup的消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'exportChat') {
-    exportChatToMarkdown()
+    const format = request.format || 'md';
+    exportChat(format)
       .then((result) => sendResponse({ 
         success: true,
         messageCount: result.messageCount,
@@ -279,11 +280,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-async function exportChatToMarkdown() {
+async function exportChat(format = 'md') {
   const startTime = Date.now();
   exportCancelled = false; // Reset cancellation flag
   try {
-    console.log('Starting chat export...');
+    console.log(`Starting chat export (format: ${format})...`);
     reportProgress('Starting export...', 'Initializing', 0, 0);
     
     // Get conversation title
@@ -309,10 +310,18 @@ async function exportChatToMarkdown() {
       else geminiCount++;
     });
     
-    // Convert to Markdown and download
-    reportProgress('Generating file...', 'Creating markdown', 95, messages.length);
-    const markdown = convertToMarkdown(messages, title);
-    downloadMarkdown(markdown, title);
+    // Branch based on format
+    const fileExt = format === 'html' ? '.html' : '.md';
+    
+    if (format === 'html') {
+      reportProgress('Generating file...', 'Creating printable HTML', 95, messages.length);
+      const html = convertToHTML(messages, title);
+      downloadFile(html, title, 'text/html', '.html');
+    } else {
+      reportProgress('Generating file...', 'Creating markdown', 95, messages.length);
+      const markdown = convertToMarkdown(messages, title);
+      downloadFile(markdown, title, 'text/markdown;charset=utf-8', '.md');
+    }
     
     reportProgress('Complete!', 'File downloaded', 100, messages.length);
     
@@ -320,13 +329,13 @@ async function exportChatToMarkdown() {
     const elapsed = Math.round((Date.now() - startTime) / 1000);
     
     // Show success on page
-    showOnPageSuccess(messages.length, userCount, geminiCount, title + '.md', elapsed);
+    showOnPageSuccess(messages.length, userCount, geminiCount, title + fileExt, elapsed);
     
     return {
       messageCount: messages.length,
       userCount: userCount,
       geminiCount: geminiCount,
-      filename: title + '.md'
+      filename: title + fileExt
     };
   } catch (error) {
     console.error('Export failed:', error);
@@ -1011,9 +1020,247 @@ function extractMessageContent(element) {
   }
 }
 
-function downloadMarkdown(content, title = 'gemini-chat') {
+function convertToHTML(messages, title = 'Gemini Chat') {
+  const exportDate = new Date().toLocaleString('en-US');
+  const totalMessages = messages.length;
+  let userCount = 0;
+  let geminiCount = 0;
+  messages.forEach(msg => {
+    if (msg.author === 'User') userCount++;
+    else geminiCount++;
+  });
+
+  // Build message HTML
+  let messagesHTML = '';
+  messages.forEach((msg) => {
+    const isUser = msg.author === 'User';
+    const authorClass = isUser ? 'user' : 'gemini';
+    const authorLabel = isUser ? '👤 You' : '✨ Gemini';
+    
+    // Escape HTML in content, then convert markdown-like formatting
+    let content = escapeHTML(msg.content);
+    
+    // Convert code blocks: ```lang\ncode\n``` → <pre><code>
+    content = content.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+      return `<pre><code class="language-${lang || 'text'}">${code}</code></pre>`;
+    });
+    
+    // Convert inline code: `code` → <code>
+    content = content.replace(/`([^`]+)`/g, '<code>$1</code>');
+    
+    // Convert bold: **text** → <strong>
+    content = content.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    
+    // Convert italic: *text* → <em>
+    content = content.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+    
+    // Convert headers
+    content = content.replace(/^#{6}\s+(.+)$/gm, '<h6>$1</h6>');
+    content = content.replace(/^#{5}\s+(.+)$/gm, '<h5>$1</h5>');
+    content = content.replace(/^#{4}\s+(.+)$/gm, '<h4>$1</h4>');
+    content = content.replace(/^#{3}\s+(.+)$/gm, '<h3>$1</h3>');
+    content = content.replace(/^#{2}\s+(.+)$/gm, '<h2>$1</h2>');
+    content = content.replace(/^#{1}\s+(.+)$/gm, '<h1>$1</h1>');
+    
+    // Convert line breaks to <br> (but not inside <pre>)
+    content = content.replace(/\n/g, '<br>\n');
+    
+    messagesHTML += `
+      <div class="message ${authorClass}">
+        <div class="author">${authorLabel}</div>
+        <div class="content">${content}</div>
+      </div>`;
+  });
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHTML(title)}</title>
+  <style>
+    /* ===== Base Reset & Typography ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 15px; }
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.7;
+      color: #1a1a2e;
+      background: #f0f2f5;
+      padding: 0;
+    }
+
+    /* ===== Page Container ===== */
+    .page {
+      max-width: 820px;
+      margin: 0 auto;
+      background: #ffffff;
+      min-height: 100vh;
+      padding: 48px 56px;
+    }
+
+    /* ===== Header ===== */
+    .header {
+      text-align: center;
+      padding-bottom: 28px;
+      margin-bottom: 32px;
+      border-bottom: 2px solid #e8eaed;
+    }
+    .header h1 {
+      font-size: 1.65rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 8px;
+    }
+    .header .meta {
+      font-size: 0.82rem;
+      color: #5f6368;
+      display: flex;
+      justify-content: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    .header .meta span { white-space: nowrap; }
+
+    /* ===== Message Bubbles ===== */
+    .message {
+      margin-bottom: 20px;
+      padding: 16px 20px;
+      border-radius: 12px;
+      page-break-inside: avoid;
+    }
+    .message.user {
+      background: #e8f0fe;
+      border-left: 4px solid #4285f4;
+    }
+    .message.gemini {
+      background: #f8f9fa;
+      border-left: 4px solid #34a853;
+    }
+    .author {
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .message.user .author { color: #1967d2; }
+    .message.gemini .author { color: #188038; }
+    .content {
+      font-size: 0.95rem;
+      line-height: 1.75;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    .content h1, .content h2, .content h3,
+    .content h4, .content h5, .content h6 {
+      margin-top: 12px;
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+    .content h1 { font-size: 1.35rem; }
+    .content h2 { font-size: 1.2rem; }
+    .content h3 { font-size: 1.1rem; }
+
+    /* ===== Code ===== */
+    code {
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.88em;
+      background: #e8eaed;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    pre {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      padding: 16px 20px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 12px 0;
+      line-height: 1.5;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+      font-size: 0.85rem;
+    }
+
+    /* ===== Lists ===== */
+    .content ul, .content ol { padding-left: 24px; margin: 8px 0; }
+    .content li { margin-bottom: 4px; }
+
+    /* ===== Footer ===== */
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 2px solid #e8eaed;
+      text-align: center;
+      font-size: 0.78rem;
+      color: #9aa0a6;
+    }
+
+    /* ===== Print Styles ===== */
+    @media print {
+      html { font-size: 12px; }
+      body { background: white; padding: 0; }
+      .page { padding: 0; box-shadow: none; max-width: 100%; }
+      .no-print { display: none !important; }
+      .message { break-inside: avoid; }
+      pre { white-space: pre-wrap; word-wrap: break-word; }
+    }
+
+    /* ===== Print Banner ===== */
+    .print-banner {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      z-index: 9999;
+      transition: transform 0.2s;
+      border: none;
+      font-family: inherit;
+    }
+    .print-banner:hover { transform: translateY(-2px); }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <h1>${escapeHTML(title)}</h1>
+      <div class="meta">
+        <span>📅 ${exportDate}</span>
+        <span>💬 ${totalMessages} messages</span>
+        <span>👤 ${userCount} user</span>
+        <span>✨ ${geminiCount} Gemini</span>
+      </div>
+    </div>
+    ${messagesHTML}
+    <div class="footer">
+      Exported by Gemini Chat Exporter &middot; ${exportDate}
+    </div>
+  </div>
+  <button class="print-banner no-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
+</body>
+</html>`;
+}
+
+function escapeHTML(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function downloadFile(content, title, mimeType, extension) {
   // Create Blob
-  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+  const blob = new Blob([content], { type: mimeType });
   
   // Create download link
   const url = URL.createObjectURL(blob);
@@ -1035,7 +1282,7 @@ function downloadMarkdown(content, title = 'gemini-chat') {
     filename = `gemini-chat-${timestamp}`;
   }
   
-  a.download = `${filename}.md`;
+  a.download = `${filename}${extension}`;
   
   console.log(`Downloading as: ${a.download}`);
   
@@ -1055,3 +1302,4 @@ function sleep(ms) {
 }
 
 console.log('Gemini Chat Exporter content script loaded');
+

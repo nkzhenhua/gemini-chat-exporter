@@ -92,8 +92,11 @@ document.addEventListener('DOMContentLoaded', function() {
       // Get current active tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
+      // Get selected export format
+      const selectedFormat = document.querySelector('input[name="format"]:checked').value;
+
       // Send message to content script
-      chrome.tabs.sendMessage(tab.id, { action: 'exportChat' }, function(response) {
+      chrome.tabs.sendMessage(tab.id, { action: 'exportChat', format: selectedFormat }, function(response) {
         if (chrome.runtime.lastError) {
           // Content script not available - refresh the page and retry
           updateProgressDisplay({
