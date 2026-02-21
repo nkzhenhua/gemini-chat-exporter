@@ -1,6 +1,6 @@
 # Gemini Chat Exporter
 
-A Chrome extension to export Google Gemini chat conversations to beautifully formatted Markdown files with real-time progress tracking.
+A Chrome extension to export Google Gemini chat conversations to beautifully formatted Markdown files, with batch conversation deletion and real-time progress tracking.
 
 [![Chrome Web Store](https://img.shields.io/badge/Chrome-Web%20Store-blue)](https://chromewebstore.google.com/detail/gemini-chat-exporter/jeljphodifjgpkcplmjcophjbbnkmmfn)
 [![MIT License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -12,6 +12,13 @@ A Chrome extension to export Google Gemini chat conversations to beautifully for
 - **Code blocks**: Syntax highlighting support with language tags
 - **Proper structure**: Nested lists with correct indentation
 - **Clean output**: Professional, readable Markdown files
+
+### 🗑️ Batch Delete
+- **Multi-select conversations** with checkboxes in the sidebar
+- **Select All / Deselect All** with one click
+- **Confirmation dialog** before any destructive action
+- **Progress tracking** — smooth progress bar during deletion
+- **Stealth mode** — native Gemini dialogs hidden for clean UX
 
 ### 📊 Real-Time Progress Tracking
 - **Live progress bar** showing 0-100% completion
@@ -63,6 +70,17 @@ A Chrome extension to export Google Gemini chat conversations to beautifully for
 - **Long conversations** - May take 1-2 minutes for 200+ messages
 - **Export format** - Files are named using the conversation title
 
+### Batch Delete Conversations
+1. Click the extension icon and switch to the **🗑️ Batch Delete** tab
+2. Click **Enter Batch Delete Mode**
+3. Checkboxes appear next to each conversation in the sidebar (under "Chats")
+4. Select conversations individually or use **Select All**
+5. Click **🗑️ Delete** and confirm in the confirmation dialog
+6. Watch the progress bar — deletions happen sequentially in the background
+7. Click **✕ Exit** to leave batch delete mode without deleting
+
+> ⚠️ **Warning**: Deleted conversations cannot be recovered.
+
 ## 📸 Preview
 
 ![Extension Popup](screenshot/screenshort.png)
@@ -82,10 +100,10 @@ The extension shows a floating progress overlay on the Gemini page:
 gemini-exporter/
 ├── manifest.json          # Extension manifest (v3)
 ├── background.js          # Tab detection for dynamic icon state
-├── popup.html             # Extension popup UI
-├── popup.js               # Popup logic & progress display
-├── popup.css              # Popup styles
-├── content.js             # Main export logic & markdown conversion
+├── popup.html             # Extension popup UI (Export + Batch Delete tabs)
+├── popup.js               # Popup logic, tab switching & batch delete control
+├── popup.css              # Popup styles (tabs, batch delete UI)
+├── content.js             # Export logic, markdown conversion & batch delete
 ├── icons/                 # Extension icons (colored + grayscale)
 ├── PRIVACY.md             # Privacy policy
 ├── STORE_DESCRIPTION.md   # Chrome Web Store listing text
@@ -202,6 +220,6 @@ Special thanks to all contributors and users who provide feedback!
 
 ---
 
-**Version**: 1.0.0  
+**Version**: 1.1.1  
 **Last Updated**: February 2026  
 **Status**: Ready for Chrome Web Store publication

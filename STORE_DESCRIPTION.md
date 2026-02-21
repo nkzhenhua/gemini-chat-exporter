@@ -3,10 +3,10 @@
 ## Short Description (132 characters max)
 
 ```
-Export Google Gemini chats to Markdown with lists, headings & formatting. Real-time progress. Cancel anytime.
+Export Gemini chats to Markdown. Batch delete conversations. Real-time progress. Cancel anytime. Privacy first.
 ```
 
-**Character count:** 120/132 ✅
+**Character count:** 112/132 ✅
 
 ---
 
@@ -15,7 +15,7 @@ Export Google Gemini chats to Markdown with lists, headings & formatting. Real-t
 ```markdown
 # 📝 Gemini Chat Exporter
 
-Save your valuable Google Gemini conversations as beautifully formatted Markdown files.
+Save your valuable Google Gemini conversations as beautifully formatted Markdown files. Batch delete conversations you no longer need.
 
 ## ✨ Key Features
 
@@ -54,6 +54,14 @@ Save your valuable Google Gemini conversations as beautifully formatted Markdown
 5. Watch real-time progress (can close popup!)
 6. Get your beautifully formatted .md file
 
+### 🗑️ Batch Delete
+
+1. Switch to the "Batch Delete" tab in the popup
+2. Enter batch delete mode
+3. Select conversations with checkboxes
+4. Click Delete and confirm
+5. Conversations are removed seamlessly in the background
+
 ## 💡 Perfect For
 
 - 📚 Backing up important AI conversations
@@ -61,6 +69,7 @@ Save your valuable Google Gemini conversations as beautifully formatted Markdown
 - 🔗 Sharing chat responses with colleagues
 - 💾 Long-term documentation storage
 - ✍️ Creating content from AI interactions
+- 🧹 Cleaning up old or unused conversations
 
 ## 🔒 Privacy First
 
@@ -114,3 +123,5 @@ Include these naturally in the description:
 - AI chat archiver
 - Gemini save conversation
 - Export AI messages
+- Batch delete Gemini conversations
+- Gemini conversation manager
