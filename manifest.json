@@ -37,5 +37,16 @@
       ],
       "run_at": "document_idle"
     }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "batch-delete.css"
+      ],
+      "matches": [
+        "https://gemini.google.com/*",
+        "https://*.google.com/app/gemini*"
+      ]
+    }
   ]
 }
