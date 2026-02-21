@@ -413,11 +413,11 @@ function findSidebarConversations() {
     const isAfter = !!(position & Node.DOCUMENT_POSITION_FOLLOWING);
     if (!isAfter) return false;
 
-    // Exclude Settings & help, etc.
+    // Exclude only the "Settings & help" sidebar link, not conversations with "help" in title
     const text = a.textContent.trim();
     const href = a.getAttribute('href') || '';
-    if (text.includes('Settings') || text.includes('help') || text.includes('Help')) return false;
-    if (href.includes('settings') || href.includes('help')) return false;
+    if (text === 'Settings & help' || text === 'Settings') return false;
+    if (href.includes('settings') || href.includes('/faq')) return false;
     if (text.length < MIN_CONVERSATION_TITLE_LENGTH || text.length > MAX_CONVERSATION_TITLE_LENGTH) return false;
 
     return true;

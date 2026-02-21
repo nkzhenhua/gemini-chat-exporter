@@ -44,8 +44,7 @@
         "batch-delete.css"
       ],
       "matches": [
-        "https://gemini.google.com/*",
-        "https://*.google.com/app/gemini*"
+        "https://gemini.google.com/*"
       ]
     }
   ]
