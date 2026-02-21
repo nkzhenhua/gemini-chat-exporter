@@ -1,6 +1,6 @@
 # Testing Guide - Gemini Chat Exporter
 
-## Current Version: v1.0.0
+## Current Version: v1.1.1
 
 All major features implemented and tested:
 - ✅ Rich Markdown export with formatting
@@ -9,6 +9,7 @@ All major features implemented and tested:
 - ✅ Cancel functionality
 - ✅ Two-phase scroll strategy
 - ✅ Auto-recovery from errors
+- ✅ Batch delete conversations
 
 ---
 
@@ -291,6 +292,15 @@ Before releasing updates, test:
 - [ ] Connection error recovery
 - [ ] Grayscale icon on non-Gemini pages
 
+### Batch Delete
+- [ ] Enter/Exit batch delete mode
+- [ ] Checkboxes appear only under "Chats" heading
+- [ ] Individual checkbox toggle works
+- [ ] Select All / Deselect All
+- [ ] Delete with confirmation dialog
+- [ ] Progress bar during deletion
+- [ ] Exit mode cleans up all UI elements
+
 ---
 
 ## User Acceptance Criteria
@@ -300,22 +310,27 @@ Before releasing updates, test:
 - Formatting preserved (lists, headings, bold)
 - Correct chronological order
 - File named with conversation title
+- Batch delete removes selected conversations
 
 ✅ **UX**:
 - Real-time progress visible
 - Can close popup safely
 - Clear success/error messages
 - Cancel works reliably
+- Batch delete checkboxes only under "Chats"
+- No native Gemini dialogs visible during batch delete
 
 ✅ **Performance**:
 - < 30 seconds for typical conversations
 - Progress updates every few seconds
 - No browser freezing
+- Batch delete processes sequentially without rate-limit errors
 
 ✅ **Reliability**:
 - No data loss
 - Handles errors gracefully
 - Works with very long conversations
+- Batch delete reports partial failures
 
 ---
 

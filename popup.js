@@ -2,6 +2,7 @@ const BUG_REPORT_URL = 'https://github.com/nkzhenhua/gemini-chat-exporter/issues
 const FEATURE_REQUEST_URL = 'https://github.com/nkzhenhua/gemini-chat-exporter/issues/new?template=feature_request.md';
 
 document.addEventListener('DOMContentLoaded', function() {
+  // ========== Export Tab Elements ==========
   const exportBtn = document.getElementById('exportBtn');
   const statusDiv = document.getElementById('status');
   const statusText = document.getElementById('statusText');
@@ -14,13 +15,43 @@ document.addEventListener('DOMContentLoaded', function() {
   const messageCount = document.getElementById('messageCount');
   const successBox = document.getElementById('successBox');
   const successDetails = document.getElementById('successDetails');
-  
+
+  // ========== Batch Delete Tab Elements ==========
+  const enterBatchDeleteBtn = document.getElementById('enterBatchDeleteBtn');
+  const exitBatchDeleteBtn = document.getElementById('exitBatchDeleteBtn');
+  const batchDeleteInactive = document.getElementById('batchDeleteInactive');
+  const batchDeleteActive = document.getElementById('batchDeleteActive');
+  const batchSelectedCount = document.getElementById('batchSelectedCount');
+  const batchSelectAllBtn = document.getElementById('batchSelectAllBtn');
+  const batchDeleteSelectedBtn = document.getElementById('batchDeleteSelectedBtn');
+  const batchError = document.getElementById('batchError');
+
   let exportStartTime = null;
+  let batchDeleteModeActive = false;
+
+  // ========== Tab Switching ==========
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      // Update active tab button
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+
+      // Show corresponding panel
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+      const targetPanel = document.getElementById(this.dataset.tab);
+      if (targetPanel) targetPanel.classList.remove('hidden');
+    });
+  });
+
+  // ========== Export Tab Logic (unchanged) ==========
 
   // Listen for progress messages from content script
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'exportProgress') {
       updateProgressDisplay(message);
+    }
+    if (message.type === 'batchDeleteStatus') {
+      updateBatchDeleteStatus(message);
     }
   });
 
@@ -31,6 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!currentTab.url || !currentTab.url.includes('gemini.google.com')) {
       showError('Please use this extension on a Gemini chat page');
       exportBtn.disabled = true;
+      enterBatchDeleteBtn.disabled = true;
       return;
     }
     
@@ -75,6 +107,18 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     } catch (err) {
       console.log('Could not get title:', err);
+    }
+
+    // Check if batch delete mode is already active
+    try {
+      chrome.tabs.sendMessage(currentTab.id, { action: 'getBatchDeleteStatus' }, function(response) {
+        if (chrome.runtime.lastError) return;
+        if (response && response.active) {
+          showBatchDeleteActive(response.selectedCount || 0);
+        }
+      });
+    } catch (err) {
+      console.log('Could not check batch delete status:', err);
     }
   });
 
@@ -144,6 +188,130 @@ document.addEventListener('DOMContentLoaded', function() {
       exportBtn.disabled = false;
     }
   });
+
+  // ========== Batch Delete Logic ==========
+
+  enterBatchDeleteBtn.addEventListener('click', async function() {
+    try {
+      hideBatchError();
+      enterBatchDeleteBtn.disabled = true;
+      enterBatchDeleteBtn.textContent = 'Activating...';
+
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+      chrome.tabs.sendMessage(tab.id, { action: 'enterBatchDeleteMode' }, function(response) {
+        if (chrome.runtime.lastError) {
+          showBatchError('Content script not ready. Please refresh the page and try again.');
+          enterBatchDeleteBtn.disabled = false;
+          enterBatchDeleteBtn.textContent = '🗑️ Enter Batch Delete Mode';
+          return;
+        }
+
+        if (response && response.success) {
+          showBatchDeleteActive(0);
+        } else {
+          showBatchError(response?.error || 'Failed to enter batch delete mode. Make sure the sidebar is visible.');
+          enterBatchDeleteBtn.disabled = false;
+          enterBatchDeleteBtn.textContent = '🗑️ Enter Batch Delete Mode';
+        }
+      });
+    } catch (error) {
+      showBatchError('Error: ' + error.message);
+      enterBatchDeleteBtn.disabled = false;
+      enterBatchDeleteBtn.textContent = '🗑️ Enter Batch Delete Mode';
+    }
+  });
+
+  exitBatchDeleteBtn.addEventListener('click', async function() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    chrome.tabs.sendMessage(tab.id, { action: 'exitBatchDeleteMode' }, function(response) {
+      if (chrome.runtime.lastError) return;
+    });
+    showBatchDeleteInactive();
+  });
+
+  batchSelectAllBtn.addEventListener('click', async function() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const isSelectAll = batchSelectAllBtn.textContent === 'Select All';
+    chrome.tabs.sendMessage(tab.id, { action: 'batchSelectAll', selectAll: isSelectAll }, function(response) {
+      if (chrome.runtime.lastError) return;
+      if (response && response.success) {
+        updateBatchDeleteCount(response.selectedCount || 0);
+        batchSelectAllBtn.textContent = isSelectAll ? 'Deselect All' : 'Select All';
+      }
+    });
+  });
+
+  batchDeleteSelectedBtn.addEventListener('click', async function() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    chrome.tabs.sendMessage(tab.id, { action: 'batchDeleteSelected' }, function(response) {
+      if (chrome.runtime.lastError) return;
+      // Deletion is async; status updates come via batchDeleteStatus messages
+    });
+  });
+
+  // ========== Batch Delete Helpers ==========
+
+  function showBatchDeleteActive(count) {
+    batchDeleteModeActive = true;
+    batchDeleteInactive.classList.add('hidden');
+    batchDeleteActive.classList.remove('hidden');
+    updateBatchDeleteCount(count);
+  }
+
+  function showBatchDeleteInactive() {
+    batchDeleteModeActive = false;
+    batchDeleteActive.classList.add('hidden');
+    batchDeleteInactive.classList.remove('hidden');
+    enterBatchDeleteBtn.disabled = false;
+    enterBatchDeleteBtn.textContent = '🗑️ Enter Batch Delete Mode';
+    batchSelectAllBtn.textContent = 'Select All';
+  }
+
+  function updateBatchDeleteCount(count) {
+    batchSelectedCount.textContent = `${count} selected`;
+    batchDeleteSelectedBtn.textContent = `Delete ${count}`;
+    batchDeleteSelectedBtn.disabled = count === 0;
+  }
+
+  function updateBatchDeleteStatus(data) {
+    if (data.selectedCount !== undefined) {
+      updateBatchDeleteCount(data.selectedCount);
+    }
+    if (data.phase === 'complete') {
+      // Deletion finished - show success briefly then reset
+      batchSelectedCount.textContent = `✅ ${data.deletedCount || 0} deleted`;
+      setTimeout(() => {
+        showBatchDeleteInactive();
+      }, 3000);
+    }
+    if (data.phase === 'deleting') {
+      batchSelectedCount.textContent = `Deleting ${data.current}/${data.total}...`;
+      batchDeleteSelectedBtn.disabled = true;
+      batchSelectAllBtn.disabled = true;
+      exitBatchDeleteBtn.disabled = true;
+    }
+    if (data.phase === 'error') {
+      showBatchError(data.error || 'Deletion failed');
+      batchDeleteSelectedBtn.disabled = false;
+      batchSelectAllBtn.disabled = false;
+      exitBatchDeleteBtn.disabled = false;
+    }
+    if (data.exited) {
+      showBatchDeleteInactive();
+    }
+  }
+
+  function showBatchError(message) {
+    batchError.textContent = message;
+    batchError.classList.remove('hidden');
+  }
+
+  function hideBatchError() {
+    batchError.classList.add('hidden');
+  }
+
+  // ========== Export Tab Helpers (unchanged) ==========
 
   function updateProgressDisplay(data) {
     // Update progress bar

@@ -278,7 +278,869 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true; // 保持消息通道开放以进行异步响应
   }
+
+  // ========== Batch Delete Actions ==========
+  if (request.action === 'enterBatchDeleteMode') {
+    try {
+      const result = enterBatchDeleteMode();
+      sendResponse(result);
+    } catch (error) {
+      sendResponse({ success: false, error: error.message });
+    }
+    return false;
+  }
+
+  if (request.action === 'exitBatchDeleteMode') {
+    cleanupBatchDeleteMode();
+    sendResponse({ success: true });
+    return false;
+  }
+
+  if (request.action === 'getBatchDeleteStatus') {
+    sendResponse({
+      active: batchDeleteState.active,
+      selectedCount: getSelectedCount()
+    });
+    return false;
+  }
+
+  if (request.action === 'batchSelectAll') {
+    const selectAll = request.selectAll;
+    const checkboxes = document.querySelectorAll('.gce-batch-checkbox');
+    checkboxes.forEach(cb => { cb.checked = selectAll; });
+    const count = selectAll ? checkboxes.length : 0;
+    updateBatchToolbar(count);
+    sendResponse({ success: true, selectedCount: count });
+    return false;
+  }
+
+  if (request.action === 'batchDeleteSelected') {
+    batchDeleteSelected()
+      .then(result => sendResponse(result))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true; // async
+  }
 });
+
+// ========================================================================
+// BATCH DELETE FEATURE
+// ========================================================================
+
+const batchDeleteState = {
+  active: false,
+  deleting: false
+};
+
+function reportBatchStatus(data) {
+  try {
+    chrome.runtime.sendMessage({
+      type: 'batchDeleteStatus',
+      ...data
+    }, () => {
+      if (chrome.runtime.lastError) { /* popup may be closed */ }
+    });
+  } catch (e) {
+    console.log('Batch status report failed:', e);
+  }
+}
+
+// ===== Find sidebar conversation items =====
+function findSidebarConversations() {
+  let items = [];
+
+  // Find the "Chats" heading in the sidebar to only get conversations below it
+  // The sidebar has sections: New chat, My stuff, Gems, (recent), "Chats", (conversations)
+  const sidebar = document.querySelector('nav, [role="navigation"], aside, [class*="sidebar"]');
+  if (!sidebar) {
+    console.warn('[BatchDelete] Could not find sidebar');
+    return [];
+  }
+
+  // Strategy: Find the "Chats" text node and only get links that come AFTER it
+  let chatsHeadingFound = false;
+  let chatsHeadingElement = null;
+
+  // Look for "Chats" heading text in the sidebar
+  const allTextElements = sidebar.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, div');
+  for (const el of allTextElements) {
+    const text = el.textContent.trim();
+    // Match "Chats" heading (direct text content, not deeply nested text)
+    if (text === 'Chats' && el.children.length === 0) {
+      chatsHeadingElement = el;
+      chatsHeadingFound = true;
+      console.log(`[BatchDelete] Found "Chats" heading: <${el.tagName.toLowerCase()}>`);
+      break;
+    }
+  }
+
+  if (!chatsHeadingFound) {
+    console.warn('[BatchDelete] Could not find "Chats" heading in sidebar');
+    // Fallback: try to find conversations by URL pattern, but exclude known non-chat links
+    const allLinks = sidebar.querySelectorAll('a[href]');
+    items = Array.from(allLinks).filter(a => {
+      const href = a.getAttribute('href') || '';
+      const text = a.textContent.trim();
+      // Exclude known non-conversation items
+      if (text.includes('New chat') || text.includes('My stuff') || text.includes('Gems')) return false;
+      if (href.includes('settings') || href.includes('help') || href.includes('faq')) return false;
+      if (text.length < 2 || text.length > 200) return false;
+      return true;
+    });
+    console.log(`[BatchDelete] Fallback: found ${items.length} conversations`);
+    return items;
+  }
+
+  // Get all links in the sidebar
+  const allLinks = Array.from(sidebar.querySelectorAll('a[href]'));
+  
+  // Filter to only links that appear AFTER the "Chats" heading in DOM order
+  // We use compareDocumentPosition to check ordering
+  items = allLinks.filter(a => {
+    // Must come after the Chats heading
+    const position = chatsHeadingElement.compareDocumentPosition(a);
+    const isAfter = !!(position & Node.DOCUMENT_POSITION_FOLLOWING);
+    if (!isAfter) return false;
+
+    // Exclude Settings & help, etc.
+    const text = a.textContent.trim();
+    const href = a.getAttribute('href') || '';
+    if (text.includes('Settings') || text.includes('help') || text.includes('Help')) return false;
+    if (href.includes('settings') || href.includes('help')) return false;
+    if (text.length < 2 || text.length > 200) return false;
+
+    return true;
+  });
+
+  console.log(`[BatchDelete] Found ${items.length} conversations under "Chats" heading`);
+  return items;
+}
+
+// ===== Enter batch delete mode =====
+function enterBatchDeleteMode() {
+  if (batchDeleteState.active) {
+    return { success: true, alreadyActive: true };
+  }
+
+  const conversations = findSidebarConversations();
+  if (conversations.length === 0) {
+    return { success: false, error: 'No conversations found in sidebar. Make sure the sidebar is open.' };
+  }
+
+  batchDeleteState.active = true;
+
+  // Inject checkboxes into each conversation item
+  conversations.forEach((conv, index) => {
+    // Skip if already has checkbox
+    if (conv.querySelector('.gce-batch-checkbox')) return;
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'gce-batch-checkbox';
+    checkbox.dataset.index = index;
+    checkbox.style.cssText = `
+      width: 18px;
+      height: 18px;
+      min-width: 18px;
+      cursor: pointer;
+      accent-color: #667eea;
+      margin-right: 8px;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 10;
+    `;
+
+    // Stop mousedown from reaching the <a> tag (prevents navigation)
+    checkbox.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+    });
+
+    // Stop click from bubbling to <a> tag, but do NOT preventDefault
+    // so the checkbox toggles naturally
+    checkbox.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    // Update count when checkbox state changes
+    checkbox.addEventListener('change', () => {
+      const count = getSelectedCount();
+      updateBatchToolbar(count);
+      reportBatchStatus({ selectedCount: count });
+    });
+
+    // Make the conversation a flex container so checkbox sits nicely
+    conv.style.display = 'flex';
+    conv.style.alignItems = 'center';
+    conv.insertBefore(checkbox, conv.firstChild);
+  });
+
+  // Create floating toolbar
+  createBatchToolbar();
+
+  // Inject styles
+  injectBatchDeleteStyles();
+
+  console.log(`[BatchDelete] Mode activated. ${conversations.length} conversations found.`);
+  return { success: true, conversationCount: conversations.length };
+}
+
+// ===== Create floating toolbar =====
+function createBatchToolbar() {
+  // Remove existing
+  const existing = document.getElementById('gce-batch-toolbar');
+  if (existing) existing.remove();
+
+  const toolbar = document.createElement('div');
+  toolbar.id = 'gce-batch-toolbar';
+  toolbar.innerHTML = `
+    <div class="gce-toolbar-inner">
+      <div class="gce-toolbar-left">
+        <span class="gce-toolbar-count">0 selected</span>
+      </div>
+      <div class="gce-toolbar-right">
+        <button class="gce-toolbar-btn gce-select-all-btn">Select All</button>
+        <button class="gce-toolbar-btn gce-delete-btn" disabled>🗑️ Delete</button>
+        <button class="gce-toolbar-btn gce-cancel-btn">✕ Exit</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(toolbar);
+
+  // Event handlers
+  toolbar.querySelector('.gce-select-all-btn').addEventListener('click', () => {
+    const btn = toolbar.querySelector('.gce-select-all-btn');
+    const isSelectAll = btn.textContent === 'Select All';
+    const checkboxes = document.querySelectorAll('.gce-batch-checkbox');
+    checkboxes.forEach(cb => { cb.checked = isSelectAll; });
+    btn.textContent = isSelectAll ? 'Deselect All' : 'Select All';
+    const count = getSelectedCount();
+    updateBatchToolbar(count);
+    reportBatchStatus({ selectedCount: count });
+  });
+
+  toolbar.querySelector('.gce-delete-btn').addEventListener('click', () => {
+    batchDeleteSelected();
+  });
+
+  toolbar.querySelector('.gce-cancel-btn').addEventListener('click', () => {
+    cleanupBatchDeleteMode();
+    reportBatchStatus({ exited: true });
+  });
+}
+
+function updateBatchToolbar(count) {
+  const toolbar = document.getElementById('gce-batch-toolbar');
+  if (!toolbar) return;
+
+  const countEl = toolbar.querySelector('.gce-toolbar-count');
+  const deleteBtn = toolbar.querySelector('.gce-delete-btn');
+
+  if (countEl) countEl.textContent = `${count} selected`;
+  if (deleteBtn) {
+    deleteBtn.textContent = `🗑️ Delete ${count > 0 ? count : ''}`;
+    deleteBtn.disabled = count === 0;
+  }
+}
+
+// ===== Get selected count =====
+function getSelectedCount() {
+  return document.querySelectorAll('.gce-batch-checkbox:checked').length;
+}
+
+// ===== Inject batch delete styles =====
+function injectBatchDeleteStyles() {
+  if (document.getElementById('gce-batch-styles')) return;
+
+  const style = document.createElement('style');
+  style.id = 'gce-batch-styles';
+  style.textContent = `
+    #gce-batch-toolbar {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 999999;
+      font-family: 'Segoe UI', -apple-system, sans-serif;
+    }
+
+    .gce-toolbar-inner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 14px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+
+    .gce-toolbar-count {
+      font-size: 15px;
+      font-weight: 700;
+      min-width: 80px;
+    }
+
+    .gce-toolbar-right {
+      display: flex;
+      gap: 8px;
+    }
+
+    .gce-toolbar-btn {
+      padding: 8px 16px;
+      border: 1.5px solid rgba(255, 255, 255, 0.35);
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.15);
+      color: white;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .gce-toolbar-btn:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .gce-toolbar-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .gce-delete-btn:not(:disabled) {
+      background: #ef5350;
+      border-color: #ef5350;
+    }
+
+    .gce-delete-btn:not(:disabled):hover {
+      background: #e53935;
+      border-color: #e53935;
+    }
+
+    .gce-cancel-btn {
+      background: transparent;
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Confirmation dialog */
+    #gce-confirm-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 9999999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', -apple-system, sans-serif;
+    }
+
+    .gce-confirm-dialog {
+      background: #fff;
+      border-radius: 16px;
+      padding: 28px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      color: #1a1a2e;
+      text-align: center;
+    }
+
+    .gce-confirm-dialog h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: #e53935;
+    }
+
+    .gce-confirm-dialog p {
+      font-size: 14px;
+      color: #555;
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+
+    .gce-confirm-dialog .gce-warning {
+      font-size: 12px;
+      color: #e53935;
+      margin-bottom: 20px;
+      font-weight: 600;
+    }
+
+    .gce-confirm-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .gce-confirm-buttons button {
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .gce-confirm-cancel {
+      background: #f0f0f0;
+      color: #333;
+    }
+
+    .gce-confirm-cancel:hover {
+      background: #e0e0e0;
+    }
+
+    .gce-confirm-delete {
+      background: #e53935;
+      color: white;
+    }
+
+    .gce-confirm-delete:hover {
+      background: #c62828;
+    }
+
+    /* Progress overlay during deletion */
+    #gce-delete-progress {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 320px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      z-index: 999999;
+      font-family: 'Segoe UI', sans-serif;
+      color: white;
+    }
+
+    .gce-delete-progress-phase {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .gce-delete-progress-detail {
+      font-size: 12px;
+      opacity: 0.9;
+      margin-bottom: 8px;
+    }
+
+    .gce-delete-progress-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .gce-delete-progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #ef5350, #ff7043);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    /* Highlight checked conversation rows */
+    .gce-batch-checkbox:checked + * ,
+    .gce-batch-checkbox:checked ~ * {
+      /* subtle highlight via parent */
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+// ===== Show confirmation dialog =====
+function showDeleteConfirmation(count) {
+  return new Promise((resolve) => {
+    // Remove existing
+    const existing = document.getElementById('gce-confirm-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'gce-confirm-overlay';
+    overlay.innerHTML = `
+      <div class="gce-confirm-dialog">
+        <h3>🗑️ Delete ${count} Conversation${count > 1 ? 's' : ''}?</h3>
+        <p>This will delete ${count} selected conversation${count > 1 ? 's' : ''} from your Gemini history.</p>
+        <div class="gce-warning">⚠️ This cannot be undone</div>
+        <div class="gce-confirm-buttons">
+          <button class="gce-confirm-cancel">Cancel</button>
+          <button class="gce-confirm-delete">Delete ${count}</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('.gce-confirm-cancel').addEventListener('click', () => {
+      overlay.remove();
+      resolve(false);
+    });
+
+    overlay.querySelector('.gce-confirm-delete').addEventListener('click', () => {
+      overlay.remove();
+      resolve(true);
+    });
+
+    // Click outside to cancel
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.remove();
+        resolve(false);
+      }
+    });
+  });
+}
+
+// ===== Show deletion progress =====
+function showDeleteProgress(current, total, convName) {
+  let progress = document.getElementById('gce-delete-progress');
+  if (!progress) {
+    progress = document.createElement('div');
+    progress.id = 'gce-delete-progress';
+    progress.innerHTML = `
+      <div class="gce-delete-progress-phase">Deleting conversations...</div>
+      <div class="gce-delete-progress-detail"></div>
+      <div class="gce-delete-progress-bar-bg">
+        <div class="gce-delete-progress-bar"></div>
+      </div>
+    `;
+    document.body.appendChild(progress);
+  }
+
+  const phase = progress.querySelector('.gce-delete-progress-phase');
+  const detail = progress.querySelector('.gce-delete-progress-detail');
+  const bar = progress.querySelector('.gce-delete-progress-bar');
+
+  phase.textContent = `Deleting ${current}/${total}...`;
+  detail.textContent = convName ? `"${convName}"` : '';
+  bar.style.width = `${Math.round((current / total) * 100)}%`;
+}
+
+function hideDeleteProgress() {
+  const progress = document.getElementById('gce-delete-progress');
+  if (progress) {
+    progress.querySelector('.gce-delete-progress-phase').textContent = '✅ Deletion complete';
+    progress.querySelector('.gce-delete-progress-bar').style.width = '100%';
+    progress.querySelector('.gce-delete-progress-bar').style.background = 'linear-gradient(90deg, #4CAF50, #8BC34A)';
+    setTimeout(() => {
+      if (progress.parentElement) {
+        progress.style.transition = 'opacity 0.5s';
+        progress.style.opacity = '0';
+        setTimeout(() => progress.remove(), 500);
+      }
+    }, 3000);
+  }
+}
+
+// ===== Simulate deleting a single conversation =====
+async function simulateDeleteConversation(conversationElement) {
+  // The conversationElement is an <a> tag in the sidebar.
+  // We need to find the "..." menu button associated with it.
+  
+  // First, hover over the conversation to make the menu button visible
+  conversationElement.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+  conversationElement.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+  await sleep(300);
+
+  // Look for the more options button ("...") - could be a sibling or child
+  let moreBtn = null;
+  const parent = conversationElement.closest('li') || conversationElement.parentElement;
+  
+  if (parent) {
+    // Look for button with aria-label containing "more" or "options" or the three dot icon
+    moreBtn = parent.querySelector('button[aria-label*="ore"], button[aria-label*="ption"], button[aria-label*="enu"], button[data-mat-icon-name*="more"], [class*="more"], [class*="option"]');
+    
+    if (!moreBtn) {
+      // Try to find any button that's not clearly something else
+      const buttons = parent.querySelectorAll('button');
+      for (const btn of buttons) {
+        const text = btn.textContent.trim().toLowerCase();
+        const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
+        // Skip the checkbox we injected
+        if (btn.classList.contains('gce-batch-checkbox')) continue;
+        // A menu button is usually small with an icon
+        if (btn.offsetWidth < 50 || text.includes('more') || ariaLabel.includes('more') || text === '⋮' || text === '...') {
+          moreBtn = btn;
+          break;
+        }
+      }
+    }
+  }
+
+  // Also try looking as a sibling
+  if (!moreBtn) {
+    const nextSibling = conversationElement.nextElementSibling;
+    if (nextSibling && (nextSibling.tagName === 'BUTTON' || nextSibling.querySelector('button'))) {
+      moreBtn = nextSibling.tagName === 'BUTTON' ? nextSibling : nextSibling.querySelector('button');
+    }
+  }
+
+  if (!moreBtn) {
+    throw new Error('Could not find menu button for conversation');
+  }
+
+  // Click the more button
+  moreBtn.click();
+  await sleep(500);
+
+  // Look for "Delete" option in the dropdown menu
+  // The menu is usually a popup that appears in the DOM
+  let deleteOption = null;
+  
+  // Try multiple selectors for the delete menu item
+  const menuSelectors = [
+    '[role="menu"] [role="menuitem"]',
+    '[role="listbox"] [role="option"]',
+    'mat-menu-content button',
+    '.mat-menu-content button', 
+    '.mat-mdc-menu-content button',
+    '[class*="menu"] button',
+    '[class*="dropdown"] button',
+    '[class*="menu"] [class*="item"]',
+  ];
+
+  for (const selector of menuSelectors) {
+    const items = document.querySelectorAll(selector);
+    for (const item of items) {
+      const text = item.textContent.trim().toLowerCase();
+      if (text.includes('delete') || text.includes('删除')) {
+        deleteOption = item;
+        break;
+      }
+    }
+    if (deleteOption) break;
+  }
+
+  // Broader fallback: find any element with "Delete" text
+  // (no offsetParent check since native dialogs are hidden via stealth CSS)
+  if (!deleteOption) {
+    const allElements = document.querySelectorAll('button, [role="menuitem"], [role="option"], [class*="item"]');
+    for (const el of allElements) {
+      const text = el.textContent.trim();
+      if (text === 'Delete' || text === '删除') {
+        deleteOption = el;
+        break;
+      }
+    }
+  }
+
+  if (!deleteOption) {
+    // Close the menu by pressing Escape
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await sleep(200);
+    throw new Error('Could not find Delete option in menu');
+  }
+
+  // Click Delete
+  deleteOption.click();
+  await sleep(500);
+
+  // Now look for the confirmation dialog's Delete/Confirm button
+  let confirmBtn = null;
+  
+  const confirmSelectors = [
+    'button[aria-label*="elete"]',
+    'button[aria-label*="onfirm"]',
+    '[role="dialog"] button',
+    '[class*="dialog"] button',
+    '[class*="modal"] button',
+    'mat-dialog-actions button',
+    '.mat-dialog-actions button',
+    '.mat-mdc-dialog-actions button',
+    '.cdk-overlay-container button',
+  ];
+
+  for (const selector of confirmSelectors) {
+    const buttons = document.querySelectorAll(selector);
+    for (const btn of buttons) {
+      const text = btn.textContent.trim().toLowerCase();
+      if (text.includes('delete') || text.includes('删除') || text.includes('confirm') || text.includes('确认')) {
+        // Make sure this is in a dialog/overlay, not the original menu
+        const isInOverlay = btn.closest('[role="dialog"], [class*="dialog"], [class*="modal"], .cdk-overlay-container, [class*="overlay"]');
+        if (isInOverlay) {
+          confirmBtn = btn;
+          break;
+        }
+      }
+    }
+    if (confirmBtn) break;
+  }
+
+  if (!confirmBtn) {
+    // Try Escape to close
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await sleep(200);
+    throw new Error('Could not find confirmation button');
+  }
+
+  // Click confirm
+  confirmBtn.click();
+  await sleep(800); // Wait for deletion animation
+
+  return true;
+}
+
+// ===== Batch delete selected conversations =====
+async function batchDeleteSelected() {
+  if (batchDeleteState.deleting) {
+    return { success: false, error: 'Deletion already in progress' };
+  }
+
+  const checkedBoxes = document.querySelectorAll('.gce-batch-checkbox:checked');
+  const count = checkedBoxes.length;
+
+  if (count === 0) {
+    return { success: false, error: 'No conversations selected' };
+  }
+
+  // Show confirmation dialog
+  const confirmed = await showDeleteConfirmation(count);
+  if (!confirmed) {
+    return { success: false, error: 'Cancelled by user' };
+  }
+
+  batchDeleteState.deleting = true;
+
+  // Disable toolbar buttons during deletion
+  const toolbar = document.getElementById('gce-batch-toolbar');
+  if (toolbar) {
+    toolbar.querySelectorAll('.gce-toolbar-btn').forEach(btn => { btn.disabled = true; });
+  }
+
+  // Inject stealth CSS to hide Gemini's native menus/dialogs during deletion
+  // Programmatic .click() still works on opacity:0 elements
+  const stealthStyle = document.createElement('style');
+  stealthStyle.id = 'gce-stealth-delete';
+  stealthStyle.textContent = `
+    .cdk-overlay-container,
+    [role="menu"],
+    [role="dialog"],
+    [class*="mat-menu"],
+    [class*="mat-dialog"],
+    [class*="mdc-dialog"],
+    [class*="overlay-pane"] {
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+    /* Re-enable pointer events on the actual buttons so .click() works */
+    .cdk-overlay-container *,
+    [role="menu"] *,
+    [role="dialog"] * {
+      pointer-events: auto !important;
+    }
+  `;
+  document.head.appendChild(stealthStyle);
+
+  let deletedCount = 0;
+  let errors = [];
+
+  // Get the conversation elements (the parent <a> of each checkbox)
+  // We need to collect them first since the DOM changes after each deletion
+  const conversationsToDelete = [];
+  checkedBoxes.forEach(cb => {
+    const conv = cb.closest('a') || cb.parentElement;
+    const name = conv ? conv.textContent.replace(/[\n\r]/g, ' ').trim().substring(0, 50) : `Conversation`;
+    conversationsToDelete.push({ element: conv, name, checkbox: cb });
+  });
+
+  for (let i = 0; i < conversationsToDelete.length; i++) {
+    const { element, name } = conversationsToDelete[i];
+    
+    showDeleteProgress(i + 1, conversationsToDelete.length, name);
+    reportBatchStatus({ phase: 'deleting', current: i + 1, total: conversationsToDelete.length });
+
+    try {
+      // Re-find the element since DOM may have changed after previous deletions
+      // We'll try to find it by its text content
+      let targetElement = element;
+      if (!document.contains(element)) {
+        // Element was removed from DOM (maybe already deleted), skip
+        console.log(`[BatchDelete] Element already removed: "${name}"`);
+        deletedCount++;
+        continue;
+      }
+
+      await simulateDeleteConversation(targetElement);
+      deletedCount++;
+      console.log(`[BatchDelete] ✓ Deleted (${i + 1}/${conversationsToDelete.length}): "${name}"`);
+      
+      // Wait between deletions to avoid rate limiting
+      if (i < conversationsToDelete.length - 1) {
+        await sleep(800);
+      }
+    } catch (error) {
+      console.error(`[BatchDelete] ✗ Failed to delete "${name}":`, error);
+      errors.push(`"${name}": ${error.message}`);
+    }
+  }
+
+  // Remove stealth CSS to restore Gemini's normal UI
+  const stealth = document.getElementById('gce-stealth-delete');
+  if (stealth) stealth.remove();
+
+  batchDeleteState.deleting = false;
+  hideDeleteProgress();
+
+  // Show result
+  if (errors.length > 0) {
+    console.warn(`[BatchDelete] Completed with errors: ${errors.length}/${conversationsToDelete.length} failed`);
+    reportBatchStatus({ 
+      phase: 'error', 
+      error: `Deleted ${deletedCount}/${conversationsToDelete.length}. ${errors.length} failed.` 
+    });
+  } else {
+    console.log(`[BatchDelete] ✓ All ${deletedCount} conversations deleted successfully`);
+    reportBatchStatus({ phase: 'complete', deletedCount });
+  }
+
+  // Cleanup batch delete mode
+  cleanupBatchDeleteMode();
+
+  return { 
+    success: true, 
+    deletedCount, 
+    totalAttempted: conversationsToDelete.length,
+    errors 
+  };
+}
+
+// ===== Cleanup =====
+function cleanupBatchDeleteMode() {
+  batchDeleteState.active = false;
+  batchDeleteState.deleting = false;
+
+  // Remove all checkboxes
+  document.querySelectorAll('.gce-batch-checkbox').forEach(cb => cb.remove());
+
+  // Remove stealth CSS (safety net if deletion was interrupted)
+  const stealth = document.getElementById('gce-stealth-delete');
+  if (stealth) stealth.remove();
+
+  // Remove toolbar
+  const toolbar = document.getElementById('gce-batch-toolbar');
+  if (toolbar) toolbar.remove();
+
+  // Remove styles
+  const styles = document.getElementById('gce-batch-styles');
+  if (styles) styles.remove();
+
+  // Remove progress overlay
+  const progress = document.getElementById('gce-delete-progress');
+  if (progress) progress.remove();
+
+  // Remove confirmation overlay
+  const confirm = document.getElementById('gce-confirm-overlay');
+  if (confirm) confirm.remove();
+
+  console.log('[BatchDelete] Mode deactivated.');
+}
 
 async function exportChat(format = 'md') {
   const startTime = Date.now();

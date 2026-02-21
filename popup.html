@@ -10,58 +10,98 @@
   <div class="container">
     <h1>💬 Gemini Chat Exporter</h1>
     
-    <!-- Warning box shown during export -->
-    <div id="warningBox" class="warning-box hidden">
-      <div class="warning-icon">⚠️</div>
-      <div class="warning-content">
-        <strong>Export in progress</strong>
-        <small>Don't close, refresh, or switch conversations</small>
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="exportTab">Export</button>
+      <button class="tab-btn" data-tab="batchDeleteTab">🗑️ Batch Delete</button>
+    </div>
+
+    <!-- ========== EXPORT TAB ========== -->
+    <div id="exportTab" class="tab-panel">
+      <!-- Warning box shown during export -->
+      <div id="warningBox" class="warning-box hidden">
+        <div class="warning-icon">⚠️</div>
+        <div class="warning-content">
+          <strong>Export in progress</strong>
+          <small>Don't close, refresh, or switch conversations</small>
+        </div>
       </div>
-    </div>
-    
-    <!-- Progress display -->
-    <div id="progressBox" class="progress-box hidden">
-      <div class="progress-bar-container">
-        <div id="progressBar" class="progress-bar"></div>
+      
+      <!-- Progress display -->
+      <div id="progressBox" class="progress-box hidden">
+        <div class="progress-bar-container">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+        <div id="progressPhase" class="progress-phase">Initializing...</div>
+        <div id="progressDetail" class="progress-detail"></div>
+        <div id="messageCount" class="message-count"></div>
       </div>
-      <div id="progressPhase" class="progress-phase">Initializing...</div>
-      <div id="progressDetail" class="progress-detail"></div>
-      <div id="messageCount" class="message-count"></div>
+      
+      <!-- Old status div (keeping for compatibility) -->
+      <div id="status" class="status hidden">
+        <div class="spinner"></div>
+        <span id="statusText">Processing...</span>
+      </div>
+      
+      <div id="error" class="error hidden"></div>
+      
+      <!-- Success box with details -->
+      <div id="successBox" class="success-box hidden">
+        <div class="success-icon">✅</div>
+        <div id="successDetails"></div>
+      </div>
+      
+      <!-- Format selector -->
+      <div class="format-selector">
+        <label class="format-option">
+          <input type="radio" name="format" value="html" checked>
+          🌐 HTML
+        </label>
+        <label class="format-option">
+          <input type="radio" name="format" value="md">
+          📝 Markdown
+        </label>
+      </div>
+      
+      <button id="exportBtn" class="export-btn">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 14L6 10H8V4H12V10H14L10 14Z" fill="currentColor"/>
+          <path d="M16 16H4V18H16V16Z" fill="currentColor"/>
+        </svg>
+        Download Chat
+      </button>
     </div>
-    
-    <!-- Old status div (keeping for compatibility) -->
-    <div id="status" class="status hidden">
-      <div class="spinner"></div>
-      <span id="statusText">Processing...</span>
+
+    <!-- ========== BATCH DELETE TAB ========== -->
+    <div id="batchDeleteTab" class="tab-panel hidden">
+      <!-- Inactive state: show enter button -->
+      <div id="batchDeleteInactive">
+        <div class="batch-delete-desc">
+          <p>Select multiple conversations from the sidebar and delete them in batch.</p>
+        </div>
+        <button id="enterBatchDeleteBtn" class="batch-delete-enter-btn">
+          🗑️ Enter Batch Delete Mode
+        </button>
+      </div>
+
+      <!-- Active state: show status -->
+      <div id="batchDeleteActive" class="hidden">
+        <div class="mode-indicator">
+          <span class="mode-dot"></span>
+          Batch Delete Mode Active
+        </div>
+        <div class="batch-status-text">Checkboxes added to sidebar. Select conversations to delete.</div>
+        <div id="batchSelectedCount" class="batch-selected-count">0 selected</div>
+        <div class="batch-action-row">
+          <button id="batchSelectAllBtn" class="batch-action-btn">Select All</button>
+          <button id="batchDeleteSelectedBtn" class="batch-action-btn danger" disabled>Delete 0</button>
+        </div>
+        <button id="exitBatchDeleteBtn" class="batch-exit-btn">Cancel</button>
+      </div>
+
+      <!-- Delete error -->
+      <div id="batchError" class="error hidden"></div>
     </div>
-    
-    <div id="error" class="error hidden"></div>
-    
-    <!-- Success box with details -->
-    <div id="successBox" class="success-box hidden">
-      <div class="success-icon">✅</div>
-      <div id="successDetails"></div>
-    </div>
-    
-    <!-- Format selector -->
-    <div class="format-selector">
-      <label class="format-option">
-        <input type="radio" name="format" value="html" checked>
-        🌐 HTML
-      </label>
-      <label class="format-option">
-        <input type="radio" name="format" value="md">
-        📝 Markdown
-      </label>
-    </div>
-    
-    <button id="exportBtn" class="export-btn">
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M10 14L6 10H8V4H12V10H14L10 14Z" fill="currentColor"/>
-        <path d="M16 16H4V18H16V16Z" fill="currentColor"/>
-      </svg>
-      Download Chat
-    </button>
     
     <div class="footer">
       <small>

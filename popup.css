@@ -22,6 +22,46 @@ h1 {
   text-align: center;
 }
 
+/* ========== Tab Bar ========== */
+.tab-bar {
+  display: flex;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 14px;
+  gap: 3px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  transition: all 0.25s ease;
+  white-space: nowrap;
+}
+
+.tab-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tab-btn.active {
+  background: rgba(255, 255, 255, 0.92);
+  color: #667eea;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* ========== Tab Panels ========== */
+.tab-panel.hidden {
+  display: none;
+}
+
 .description {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.9);
@@ -298,4 +338,144 @@ h1 {
   font-size: 13px;
   display: block;
   margin-bottom: 6px;
+}
+
+/* ========== Batch Delete Tab ========== */
+.batch-delete-desc {
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 16px;
+  line-height: 1.6;
+  padding: 0 4px;
+}
+
+.batch-delete-enter-btn {
+  width: 100%;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #ef5350, #e53935);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(229, 57, 53, 0.35);
+}
+
+.batch-delete-enter-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(229, 57, 53, 0.45);
+}
+
+.batch-delete-enter-btn:active {
+  transform: translateY(0);
+}
+
+.batch-delete-enter-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Active mode indicator */
+.mode-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.mode-dot {
+  width: 10px;
+  height: 10px;
+  background: #4CAF50;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(76, 175, 80, 0.6); }
+  50% { opacity: 0.7; box-shadow: 0 0 16px rgba(76, 175, 80, 0.8); }
+}
+
+.batch-status-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.batch-selected-count {
+  font-size: 28px;
+  font-weight: 700;
+  text-align: center;
+  margin: 12px 0 16px;
+  letter-spacing: -0.5px;
+}
+
+.batch-action-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.batch-action-btn {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.batch-action-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.batch-action-btn.danger {
+  background: #ef5350;
+  border-color: #ef5350;
+  color: #fff;
+}
+
+.batch-action-btn.danger:hover {
+  background: #e53935;
+  border-color: #e53935;
+}
+
+.batch-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.batch-exit-btn {
+  width: 100%;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.batch-exit-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.hidden {
+  display: none !important;
 }
