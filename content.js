@@ -1165,9 +1165,17 @@ async function scrollAndCollectMessages() {
   
   // Helper to collect currently visible messages and add new ones to orderedMessages
   function collectInOrder() {
-    // Use conversation-container divs to guarantee correct ordering
-    // Each container has exactly one user-query + one model-response
-    const containers = searchContainer.querySelectorAll('.conversation-container');
+    // Use conversation-container divs to guarantee correct order
+    // Convert to Array and SORT by current vertical visual position on screen!
+    // This is vital because virtual scrollers can recycle DOM nodes in arbitrary DOM order.
+    const containerNodes = searchContainer.querySelectorAll('.conversation-container');
+    let containers = Array.from(containerNodes);
+    
+    // Sort containers by their visual top position on screen
+    containers.sort((a, b) => {
+      return a.getBoundingClientRect().top - b.getBoundingClientRect().top;
+    });
+
     let messageElements = [];
     
     if (containers.length > 0) {
@@ -1178,7 +1186,7 @@ async function scrollAndCollectMessages() {
         if (mr) messageElements.push(mr);
       });
     } else {
-      // Fallback: separate queries with DOM position sort
+      // Fallback: separate queries with raw DOM position sort
       const modelResponses = searchContainer.querySelectorAll('model-response');
       const userQueries = searchContainer.querySelectorAll('user-query');
       if (modelResponses.length > 0 || userQueries.length > 0) {
@@ -1205,17 +1213,10 @@ async function scrollAndCollectMessages() {
         const isUser = isUserMessage(element);
         const author = isUser ? 'User' : 'Gemini';
         
-        // Compute absolute position within the scroll container
-        // scrollTop = how far we've scrolled; element's rect top relative to container's rect top = position within viewport
-        const containerRect = chatContainer.getBoundingClientRect();
-        const elementRect = element.getBoundingClientRect();
-        const absolutePosition = chatContainer.scrollTop + (elementRect.top - containerRect.top);
-        
         orderedMessages.push({
           author: author,
           content: content.trim(),
-          key: key,
-          position: absolutePosition
+          key: key
         });
         newCount++;
       } catch (error) {
@@ -1264,12 +1265,11 @@ async function scrollAndCollectMessages() {
   await sleep(300);
   collectInOrder();
   
-  reportProgress('Phase 2/2: Complete', 'Sorting by position...', 90, orderedMessages.length);
+  reportProgress('Phase 2/2: Complete', 'Finalizing...', 90, orderedMessages.length);
   
-  // Sort by absolute scroll position to ensure chronological order
-  // This is critical because virtual scrolling means messages collected at different
-  // scroll positions are NOT necessarily appended in chronological order
-  orderedMessages.sort((a, b) => a.position - b.position);
+  // Notice: no sorting here!
+  // Appending newly visible elements as we scroll top-to-bottom guarantees 
+  // chronological order perfectly when combined with per-frame visual sorting.
   
   console.log(`✓ Collection complete. Total messages: ${orderedMessages.length}`);
   
