@@ -1165,21 +1165,37 @@ async function scrollAndCollectMessages() {
   
   // Helper to collect currently visible messages and add new ones to orderedMessages
   function collectInOrder() {
+    // Use conversation-container divs to guarantee correct order
+    // Convert to Array and SORT by current vertical visual position on screen!
+    // This is vital because virtual scrollers can recycle DOM nodes in arbitrary DOM order.
+    const containerNodes = searchContainer.querySelectorAll('.conversation-container');
+    let containers = Array.from(containerNodes);
+    
+    // Sort containers by their visual top position on screen
+    containers.sort((a, b) => {
+      return a.getBoundingClientRect().top - b.getBoundingClientRect().top;
+    });
+
     let messageElements = [];
     
-    // Find user-query and model-response elements
-    const modelResponses = searchContainer.querySelectorAll('model-response');
-    const userQueries = searchContainer.querySelectorAll('user-query');
-    
-    if (modelResponses.length > 0 || userQueries.length > 0) {
-      messageElements = [...Array.from(userQueries), ...Array.from(modelResponses)];
-      // Sort by DOM position
-      messageElements.sort((a, b) => {
-        if (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) {
-          return -1;
-        }
-        return 1;
+    if (containers.length > 0) {
+      containers.forEach(container => {
+        const uq = container.querySelector(':scope > user-query');
+        if (uq) messageElements.push(uq);
+        const mr = container.querySelector(':scope > model-response');
+        if (mr) messageElements.push(mr);
       });
+    } else {
+      // Fallback: separate queries with raw DOM position sort
+      const modelResponses = searchContainer.querySelectorAll('model-response');
+      const userQueries = searchContainer.querySelectorAll('user-query');
+      if (modelResponses.length > 0 || userQueries.length > 0) {
+        messageElements = [...Array.from(userQueries), ...Array.from(modelResponses)];
+        messageElements.sort((a, b) => {
+          if (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+          return 1;
+        });
+      }
     }
     
     let newCount = 0;
@@ -1200,8 +1216,7 @@ async function scrollAndCollectMessages() {
         orderedMessages.push({
           author: author,
           content: content.trim(),
-          key: key,
-          domPosition: element.getBoundingClientRect().top + chatContainer.scrollTop // Record absolute position
+          key: key
         });
         newCount++;
       } catch (error) {
@@ -1250,10 +1265,11 @@ async function scrollAndCollectMessages() {
   await sleep(300);
   collectInOrder();
   
-  reportProgress('Phase 2/2: Complete', 'Sorting messages...', 90, orderedMessages.length);
+  reportProgress('Phase 2/2: Complete', 'Finalizing...', 90, orderedMessages.length);
   
-  // CRITICAL: Sort by absolute DOM position to ensure chronological order
-  orderedMessages.sort((a, b) => a.domPosition - b.domPosition);
+  // Notice: no sorting here!
+  // Appending newly visible elements as we scroll top-to-bottom guarantees 
+  // chronological order perfectly when combined with per-frame visual sorting.
   
   console.log(`✓ Collection complete. Total messages: ${orderedMessages.length}`);
   
@@ -1297,25 +1313,26 @@ function collectVisibleMessages(messagesMap, chatContainer) {
   let messageElements = [];
   let strategy = '';
   
-  // Strategy 1: Look for conversation turn containers (most reliable)
-  // Search ONLY within chatContainer, not the entire document!
-  const turnContainers = chatContainer.querySelectorAll('[data-test-id*="conversation"], [class*="conversation-turn"], [class*="turn-container"]');
-  if (turnContainers.length > 0) {
-    messageElements = Array.from(turnContainers);
-    strategy = 'turn-containers';
+  // Strategy 1: Use conversation-container divs (most reliable, guarantees order)
+  const conversationContainers = chatContainer.querySelectorAll('.conversation-container');
+  if (conversationContainers.length > 0) {
+    conversationContainers.forEach(container => {
+      const uq = container.querySelector(':scope > user-query');
+      if (uq) messageElements.push(uq);
+      const mr = container.querySelector(':scope > model-response');
+      if (mr) messageElements.push(mr);
+    });
+    strategy = 'conversation-container';
   }
   
-  // Strategy 2: Look for model-response and user-query elements
+  // Strategy 2: Look for model-response and user-query elements (fallback)
   if (messageElements.length === 0) {
     const modelResponses = chatContainer.querySelectorAll('model-response');
     const userQueries = chatContainer.querySelectorAll('user-query');
     if (modelResponses.length > 0 || userQueries.length > 0) {
       messageElements = [...Array.from(userQueries), ...Array.from(modelResponses)];
-      // Sort by DOM position
       messageElements.sort((a, b) => {
-        if (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) {
-          return -1;
-        }
+        if (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
         return 1;
       });
       strategy = 'model-response-user-query';
@@ -1692,7 +1709,14 @@ function extractMessageContent(element) {
       '[role="button"]',
       '.action-button',
       '[class*="button"]',
-      'svg:not([class*="code"])'
+      'svg:not([class*="code"])',
+      '.cdk-visually-hidden',
+      'model-thoughts',
+      'source-footnote',
+      'sources-carousel-inline',
+      'tts-control',
+      'bard-avatar',
+      'message-actions'
     ];
     
     unwantedSelectors.forEach(selector => {
