@@ -1692,7 +1692,14 @@ function extractMessageContent(element) {
       '[role="button"]',
       '.action-button',
       '[class*="button"]',
-      'svg:not([class*="code"])'
+      'svg:not([class*="code"])',
+      '.cdk-visually-hidden',
+      'model-thoughts',
+      'source-footnote',
+      'sources-carousel-inline',
+      'tts-control',
+      'bard-avatar',
+      'message-actions'
     ];
     
     unwantedSelectors.forEach(selector => {
