@@ -1424,14 +1424,29 @@ function collectVisibleMessages(messagesMap, chatContainer) {
 function getConversationTitle() {
   console.log('[Title] ===== Looking for conversation title =====');
   
-  // Strategy 1: Look for the specific conversation-title element
-  // <span class="conversation-title gds-title-m">平台型公司讨论</span>
+  // Strategy 1: Use document.title first (safest and most accurate for SPA)
+  console.log(`[Title] document.title = "${document.title}"`);
+  if (document.title && document.title !== 'Gemini') {
+    let title = document.title
+      .replace(/\s*[-–—|:]\s*Gemini.*$/i, '')
+      .replace(/^Gemini\s*[-–—|:]\s*/i, '')
+      .trim();
+    
+    if (title && title.length >= 2 && title.toLowerCase() !== 'gemini') {
+      console.log(`[Title] Using document.title: "${title}"`);
+      return title;
+    }
+  }
+
+  // Strategy 2: Look for strictly the ACTIVE conversation in sidebar, or main thread title
   const selectors = [
-    '.conversation-title',
-    '[class*="conversation-title"]',
-    '.gds-title-m',
-    'span.gds-title-m',
-    '.conversation-title-container span'
+    // Strictly selected items
+    '[aria-selected="true"] .conversation-title',
+    '[aria-selected="true"] [class*="title"]',
+    '.active .conversation-title',
+    // Header title if present
+    'h1.title',
+    'header [class*="title"]'
   ];
   
   for (const selector of selectors) {
@@ -1444,29 +1459,6 @@ function getConversationTitle() {
         console.log(`[Title] ✓ Found with "${selector}": "${text}"`);
         return text;
       }
-    }
-  }
-  
-  // Debug: Log all elements with "title" in class name
-  const allTitleElements = document.querySelectorAll('[class*="title"]');
-  console.log(`[Title] Found ${allTitleElements.length} elements with "title" in class:`);
-  allTitleElements.forEach((el, i) => {
-    if (i < 10) { // Limit to first 10
-      console.log(`  [${i}] ${el.tagName}.${el.className}: "${el.textContent.trim().substring(0, 50)}"`);
-    }
-  });
-  
-  // Strategy 2: Use document.title as fallback
-  console.log(`[Title] document.title = "${document.title}"`);
-  if (document.title && document.title !== 'Gemini') {
-    let title = document.title
-      .replace(/\s*[-–—|:]\s*Gemini.*$/i, '')
-      .replace(/^Gemini\s*[-–—|:]\s*/i, '')
-      .trim();
-    
-    if (title && title.length >= 2 && title.toLowerCase() !== 'gemini') {
-      console.log(`[Title] Using document.title: "${title}"`);
-      return title;
     }
   }
   
