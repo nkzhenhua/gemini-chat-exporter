@@ -267,7 +267,7 @@ function showOnPageError(errorMessage) {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'exportChat') {
     const format = request.format || 'md';
-    exportChat(format)
+    exportChat(format, request.title)
       .then((result) => sendResponse({ 
         success: true,
         messageCount: result.messageCount,
@@ -973,15 +973,15 @@ function cleanupBatchDeleteMode() {
   console.log('[BatchDelete] Mode deactivated.');
 }
 
-async function exportChat(format = 'md') {
+async function exportChat(format = 'md', passedTitle = null) {
   const startTime = Date.now();
   exportCancelled = false; // Reset cancellation flag
   try {
     console.log(`Starting chat export (format: ${format})...`);
     reportProgress('Starting export...', 'Initializing', 0, 0);
     
-    // Get conversation title
-    const title = getConversationTitle();
+    // Get conversation title (prefer the exact one passed from popup.js button!)
+    const title = passedTitle || getConversationTitle();
     console.log(`Conversation title: ${title}`);
     
     // Use improved scroll and collection strategy

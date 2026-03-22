@@ -92,6 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
       
       if (results && results[0] && results[0].result) {
         let title = results[0].result;
+        window.extractedTitle = title;
         // Truncate long titles to prevent wrapping
         const maxLength = 20;
         if (title.length > maxLength) {
@@ -140,7 +141,11 @@ document.addEventListener('DOMContentLoaded', function() {
       const selectedFormat = document.querySelector('input[name="format"]:checked').value;
 
       // Send message to content script
-      chrome.tabs.sendMessage(tab.id, { action: 'exportChat', format: selectedFormat }, function(response) {
+      chrome.tabs.sendMessage(tab.id, { 
+        action: 'exportChat', 
+        format: selectedFormat,
+        title: window.extractedTitle 
+      }, function(response) {
         if (chrome.runtime.lastError) {
           // Content script not available - refresh the page and retry
           updateProgressDisplay({
